@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Movies</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="layout">
+    <div id="sidebar-container"></div>
+
+    <main class="main">
+        <div class="page-header">
+            <div>
+                <h1>Movie Management</h1>
+                <p>Manage movie records in the system.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openAddModal()">Add Movie</button>
+        </div>
+
+        <div class="card toolbar-card">
+            <input id="searchTitle" placeholder="Search title">
+            <button class="btn btn-primary" onclick="searchMovies()">Search</button>
+            <button class="btn btn-secondary" onclick="loadMovies()">Load All</button>
+        </div>
+
+        <div class="card">
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Genre</th>
+                    <th>Year</th>
+                    <th>Rating</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="movieTableBody"></tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- Modal -->
+<div id="movieModal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeMovieModal()"></div>
+
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Movie</h2>
+            <button class="modal-close" onclick="closeMovieModal()">×</button>
+        </div>
+
+        <div class="modal-body">
+            <input type="hidden" id="movieId">
+
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input id="title" placeholder="Enter title">
+                </div>
+
+                <div class="form-group">
+                    <label for="genre">Genre</label>
+                    <input id="genre" placeholder="Enter genre">
+                </div>
+
+                <div class="form-group">
+                    <label for="year">Year</label>
+                    <input id="year" type="number" placeholder="Enter year">
+                </div>
+
+                <div class="form-group">
+                    <label for="rating">Rating</label>
+                    <input id="rating" type="number" step="0.1" placeholder="Enter rating">
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeMovieModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveMovie()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/common.js"></script>
+<script src="js/movies.js"></script>
+<script>
+    loadSidebar("movies");
+</script>
+</body>
+</html>

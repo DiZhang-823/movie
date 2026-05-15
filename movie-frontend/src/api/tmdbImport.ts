@@ -1,0 +1,38 @@
+import { request } from '../utils/request'
+
+export type TmdbImportStatus = {
+    nextTmdbId: number
+    enabled: boolean
+    updatedAt?: string | null
+}
+
+export async function fetchTmdbImportStatus(): Promise<TmdbImportStatus> {
+    const response = await request('/admin/tmdb-import/status')
+    if (!response.ok) {
+        throw new Error('Failed to load TMDB import status')
+    }
+    return await response.json()
+}
+
+export async function setTmdbImportEnabled(enabled: boolean): Promise<TmdbImportStatus> {
+    const response = await request('/admin/tmdb-import/switch', {
+        method: 'PUT',
+        body: JSON.stringify({ enabled })
+    })
+    if (!response.ok) {
+        throw new Error('Failed to update TMDB import switch')
+    }
+    return await response.json()
+}
+
+export async function runTmdbImportOnce(tmdbId: number) {
+    const response = await request('/admin/tmdb-import/run-once', {
+        method: 'POST',
+        body: JSON.stringify({ tmdbId })
+    })
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Failed to run TMDB import')
+    }
+    return await response.json()
+}

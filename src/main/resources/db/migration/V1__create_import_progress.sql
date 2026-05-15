@@ -1,0 +1,9 @@
+CREATE TABLE import_progress (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    task_name VARCHAR(100) NOT NULL,
+    next_tmdb_id BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_import_progress_task_name (task_name)
+);

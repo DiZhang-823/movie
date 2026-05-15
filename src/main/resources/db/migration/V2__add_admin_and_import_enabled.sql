@@ -1,0 +1,5 @@
+ALTER TABLE `user`
+    ADD COLUMN is_admin TINYINT(1) NOT NULL DEFAULT 0;
+
+ALTER TABLE import_progress
+    ADD COLUMN enabled TINYINT(1) NOT NULL DEFAULT 1;

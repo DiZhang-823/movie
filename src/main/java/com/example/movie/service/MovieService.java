@@ -1,0 +1,341 @@
+package com.example.movie.service;
+
+import com.example.movie.dto.*;
+import com.example.movie.entity.*;
+import com.example.movie.enums.MovieSortField;
+import com.example.movie.exception.ResourceNotFoundException;
+import com.example.movie.repository.*;
+import com.example.movie.specification.MovieSpecifications;
+import com.example.movie.tmdb.TmdbClient;
+import com.example.movie.tmdb.dto.Cast;
+import com.example.movie.tmdb.dto.TmdbCreditsResponse;
+import com.example.movie.tmdb.dto.TmdbMovieResponse;
+import com.example.movie.tmdb.dto.TmdbPersonResponse;
+import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Service
+public class MovieService {
+
+    private final TmdbClient tmdbClient;
+    private final MovieRepository movieRepository;
+    private final GenreRepository genreRepository;
+    private final CompanyRepository companyRepository;
+    private final CountryRepository countryRepository;
+    private final CollectionRepository collectionRepository;
+    private final PersonService personService;
+    private final MoviePersonRepository moviePersonRepository;
+
+    public MovieService(TmdbClient tmdbClient, MovieRepository movieRepository,
+                        GenreRepository genreRepository,
+                        CompanyRepository companyRepository,
+                        CountryRepository countryRepository,
+                        CollectionRepository collectionRepository,
+                        PersonService personService,
+                        MoviePersonRepository moviePersonRepository) {
+        this.tmdbClient = tmdbClient;
+        this.movieRepository = movieRepository;
+        this.genreRepository = genreRepository;
+        this.companyRepository = companyRepository;
+        this.countryRepository = countryRepository;
+        this.collectionRepository = collectionRepository;
+        this.personService = personService;
+        this.moviePersonRepository = moviePersonRepository;
+    }
+
+    public TmdbMovieResponse fetchMovieByIdFromTmdb(Long movieId) {
+        return tmdbClient.getMovieById(movieId);
+    }
+
+    public TmdbCreditsResponse fetchCreditsByIdFromTmdb(Long movieId) {
+        return tmdbClient.getCreditsById(movieId);
+    }
+
+    @Transactional
+    public TmdbMovieResponse syncMovie(Long movieId) {
+        TmdbMovieResponse tmdbMovieResponse = fetchMovieByIdFromTmdb(movieId);
+
+        Movie movie = movieRepository.findByTmdbId(tmdbMovieResponse.getId()).orElseGet(Movie::new);
+
+        movie.setTmdbId(tmdbMovieResponse.getId());
+        movie.setTitle(tmdbMovieResponse.getTitle());
+        movie.setOriginalTitle(tmdbMovieResponse.getOriginalTitle());
+        if (tmdbMovieResponse.getBelongsToCollection() != null) {
+            movie.setCollectionId(tmdbMovieResponse.getBelongsToCollection().getId());
+            resolveCollection(tmdbMovieResponse.getBelongsToCollection());
+        }
+        movie.setOverview(tmdbMovieResponse.getOverview());
+        movie.setPopularity(tmdbMovieResponse.getPopularity());
+        movie.setReleaseDate(tmdbMovieResponse.getReleaseDate());
+        movie.setRevenue(tmdbMovieResponse.getRevenue());
+        movie.setRuntime(tmdbMovieResponse.getRuntime());
+        movie.setVoteAverage(tmdbMovieResponse.getVoteAverage());
+        movie.setVoteCount(tmdbMovieResponse.getVoteCount());
+        movie.setPosterPath(tmdbMovieResponse.getPosterPath());
+        movie.setImdbId(tmdbMovieResponse.getImdbId());
+
+        movie.setGenres(resolveGenres(tmdbMovieResponse.getGenres()));
+        movie.setCompanies(resolveCompanies(tmdbMovieResponse.getProductionCompanies()));
+        movie.setCountries(resolveCountries(tmdbMovieResponse.getProductionCountries()));
+
+        movieRepository.save(movie);
+
+        //同步credits
+        TmdbCreditsResponse tmdbCreditsResponse = fetchCreditsByIdFromTmdb(movieId);
+        personService.syncCredits(movie, tmdbCreditsResponse);
+
+        return tmdbMovieResponse;
+    }
+
+    private Set<Genre> resolveGenres(List<TmdbMovieResponse.Genre> genreResponses) {
+        Set<Genre> genres = new HashSet<>();
+
+        if (genreResponses == null ||  genreResponses.isEmpty()) {
+            return genres;
+        }
+
+        for (TmdbMovieResponse.Genre genreResponse : genreResponses) {
+            Genre genre = genreRepository.findByTmdbId(genreResponse.getId())
+                    .orElseGet(() -> {
+                        Genre newGenre = new Genre();
+                        newGenre.setTmdbId(genreResponse.getId());
+                        newGenre.setName(genreResponse.getName());
+                        return genreRepository.save(newGenre);
+                    });
+            genres.add(genre);
+        }
+        return genres;
+    }
+
+    private Set<Company> resolveCompanies(List<TmdbMovieResponse.ProductionCompany> companyResponses) {
+        Set<Company> companies = new HashSet<>();
+
+        if (companyResponses == null ||  companyResponses.isEmpty()) {
+            return companies;
+        }
+
+        for (TmdbMovieResponse.ProductionCompany companyResponse : companyResponses) {
+            Company company = companyRepository.findByTmdbId(companyResponse.getId())
+                    .orElseGet(() -> {
+                        Company newCompany = new Company();
+                        newCompany.setTmdbId(companyResponse.getId());
+                        newCompany.setName(companyResponse.getName());
+                        newCompany.setLogoPath(companyResponse.getLogoPath());
+                        return companyRepository.save(newCompany);
+                    });
+            companies.add(company);
+        }
+        return companies;
+    }
+
+    private Set<Country> resolveCountries(List<TmdbMovieResponse.ProductionCountry> countryResponses) {
+        Set<Country> countries = new HashSet<>();
+
+        if (countryResponses == null ||  countryResponses.isEmpty()) {
+            return countries;
+        }
+
+        for (TmdbMovieResponse.ProductionCountry countryResponse : countryResponses) {
+            Country country = countryRepository.findByCode(countryResponse.getIso31661())
+                    .orElseGet(() -> {
+                        Country newCountry = new Country();
+                        newCountry.setCode(countryResponse.getIso31661());
+                        newCountry.setName(countryResponse.getName());
+                        return countryRepository.save(newCountry);
+                    });
+            countries.add(country);
+        }
+        return countries;
+    }
+
+    private void resolveCollection(TmdbMovieResponse.CollectionInfo collectionResponse) {
+        if (collectionResponse != null) {
+            collectionRepository.findByTmdbId(collectionResponse.getId())
+                    .orElseGet(() -> {
+                        Collection newCollection = new Collection();
+                        newCollection.setTmdbId(collectionResponse.getId());
+                        newCollection.setName(collectionResponse.getName());
+                        return collectionRepository.save(newCollection);
+                    });
+        }
+    }
+
+//    public MovieResponse addMovie(MovieRequest request) {
+//        Movie movie = new Movie();
+//        movie.setDirector(request.getDirector());
+//        movie.setReleaseYear(request.getYear());
+//        movie.setTitle(request.getTitle());
+//
+//        Movie savedMovie = movieRepository.save(movie);
+//        return convertToResponse(savedMovie);
+//    }
+
+    public PageResponse<MovieResponse> getMovies(
+            MovieQuery movieQuery,
+            int page, int size, String sortBy, String direction) {
+        if (page < 0) {
+            throw new IllegalArgumentException("Page number cannot be less than 0");
+        }
+        if (size <= 0 || size > 100) {
+            throw new IllegalArgumentException("Page size must be between 1 and 100");
+        }
+
+        Sort sort = Sort.by(
+                Sort.Direction.fromString(direction),
+                MovieSortField.valueOf(sortBy).getField()
+        );
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Specification<Movie> spec = Specification.unrestricted();
+        if (movieQuery.getTitle() != null && !movieQuery.getTitle().isBlank()) {
+            spec = spec.and(MovieSpecifications.titleContains(movieQuery.getTitle()));
+        }
+        if (movieQuery.getGenreId() != null) {
+            spec = spec.and(MovieSpecifications.hasGenre(movieQuery.getGenreId()));
+        }
+        if (movieQuery.getYear() != null) {
+            spec = spec.and(MovieSpecifications.hasReleaseYear(movieQuery.getYear()));
+        }
+        if (movieQuery.getRegionCode() != null && !movieQuery.getRegionCode().isBlank()) {
+            spec = spec.and(MovieSpecifications.hasRegion(movieQuery.getRegionCode()));
+        }
+
+        Page<Movie> moviePage = movieRepository.findAll(spec, pageable);
+//        if (title != null && !title.isEmpty() && genreId != null) {
+//            moviePage = movieRepository.findByTitleAndGenre(title, genreId, pageable);
+//        } else if (title != null && !title.isEmpty()) {
+//            moviePage = movieRepository.findByTitleContainingIgnoreCase(title, pageable);
+//        } else if (genreId != null) {
+//            moviePage = movieRepository.findByGenreId(genreId, pageable);
+//        } else {
+//            moviePage = movieRepository.findAll(pageable);
+//        }
+
+        List<MovieResponse> content = moviePage.getContent()
+                .stream().map(this::convertToResponse).toList();
+
+        return  new PageResponse<>(
+                content,
+                moviePage.getNumber(),
+                moviePage.getSize(),
+                moviePage.getTotalElements(),
+                moviePage.getTotalPages(),
+                moviePage.isLast()
+        );
+    }
+
+    public MovieDetailResponse getMovieById(Long id) {
+        Movie movie = movieRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
+        return this.convertToDetailResponse(movie);
+    }
+
+//    public void deleteMovie(Long id) {
+//        Movie movie = movieRepository.findById(id)
+//                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
+//
+//        movieRepository.delete(movie);
+//    }
+
+//    public MovieResponse updateMovie(Long id, MovieRequest request) {
+//        Movie movie = movieRepository.findById(id)
+//                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
+//
+//        movie.setTitle(request.getTitle());
+//        movie.setDirector(request.getDirector());
+//        movie.setReleaseYear(request.getYear());
+//
+//        Movie updatedMovie = movieRepository.save(movie);
+//        return convertToResponse(updatedMovie);
+//    }
+
+    private MovieResponse convertToResponse(Movie movie) {
+        MovieResponse response = new MovieResponse();
+        response.setId(movie.getId());
+        response.setTmdbId(movie.getTmdbId());
+        response.setTitle(movie.getTitle());
+        response.setOriginalTitle(movie.getOriginalTitle());
+        response.setPopularity(movie.getPopularity());
+        response.setReleaseDate(movie.getReleaseDate());
+        response.setVoteAverage(movie.getVoteAverage());
+        response.setVoteCount(movie.getVoteCount());
+        response.setPosterPath(movie.getPosterPath());
+        response.setCreatedAt(movie.getCreatedAt());
+        return response;
+    }
+
+    private MovieDetailResponse convertToDetailResponse(Movie movie) {
+        MovieDetailResponse response = new MovieDetailResponse();
+
+        response.setId(movie.getId());
+        response.setTmdbId(movie.getTmdbId());
+        response.setTitle(movie.getTitle());
+        response.setOriginalTitle(movie.getOriginalTitle());
+        response.setOverview(movie.getOverview());
+        response.setPopularity(movie.getPopularity());
+        response.setReleaseDate(movie.getReleaseDate());
+        response.setRevenue(movie.getRevenue());
+        response.setRuntime(movie.getRuntime());
+        response.setVoteAverage(movie.getVoteAverage());
+        response.setVoteCount(movie.getVoteCount());
+        response.setPosterPath(movie.getPosterPath());
+        response.setImdbId(movie.getImdbId());
+
+        response.setGenres(
+                movie.getGenres().stream()
+                        .map(Genre::getName)
+                        .toList()
+        );
+
+        response.setCompanies(
+                movie.getCompanies().stream()
+                        .map(Company::getName)
+                        .toList()
+        );
+
+        response.setCountries(
+                movie.getCountries().stream()
+                        .map(Country::getName)
+                        .toList()
+        );
+
+        List<MoviePerson> moviePersons = moviePersonRepository.findByMovieIdOrderBySortOrderAsc(movie.getId());
+
+        response.setDirectors(
+                moviePersons.stream()
+                        .filter(mp -> "Director".equalsIgnoreCase(mp.getJob()))
+                        .map(this::convertToPersonItemResponse)
+                        .toList()
+        );
+
+        response.setCast(
+                moviePersons.stream()
+                        .filter(mp -> "Actor".equalsIgnoreCase(mp.getJob()))
+                        .map(this::convertToPersonItemResponse)
+                        .toList()
+        );
+
+        return response;
+    }
+
+    private PersonItemResponse convertToPersonItemResponse(MoviePerson moviePerson) {
+        PersonItemResponse item = new PersonItemResponse();
+        item.setPersonId(moviePerson.getPerson().getId());
+        item.setName(moviePerson.getPerson().getName());
+        item.setOriginalName(moviePerson.getPerson().getOriginalName());
+        item.setProfilePath(moviePerson.getPerson().getProfilePath());
+        item.setCharacter(moviePerson.getCharacterName());
+        item.setJob(moviePerson.getJob());
+        return item;
+    }
+}
