@@ -1,0 +1,13 @@
+.git
+.gitignore
+.idea
+.vscode
+.env
+.env.*
+target
+movie_db.sql
+movie_db_*.sql
+*.dump
+movie-frontend/node_modules
+movie-frontend/dist
+movie-frontend/target-run-logs

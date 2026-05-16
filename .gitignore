@@ -4,6 +4,9 @@ target/
 .env.*
 !.env.example
 src/main/resources/application-local.properties
+movie_db.sql
+movie_db_*.sql
+*.dump
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
