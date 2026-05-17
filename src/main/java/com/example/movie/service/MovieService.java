@@ -235,7 +235,7 @@ public class MovieService {
     }
 
     public MovieDetailResponse getMovieById(Long id) {
-        Movie movie = movieRepository.findById(id)
+        Movie movie = movieRepository.findDetailById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
         return this.convertToDetailResponse(movie);
     }
@@ -309,7 +309,7 @@ public class MovieService {
                         .toList()
         );
 
-        List<MoviePerson> moviePersons = moviePersonRepository.findByMovieIdOrderBySortOrderAsc(movie.getId());
+        List<MoviePerson> moviePersons = moviePersonRepository.findByMovieIdWithPersonOrderBySortOrderAsc(movie.getId());
 
         response.setDirectors(
                 moviePersons.stream()

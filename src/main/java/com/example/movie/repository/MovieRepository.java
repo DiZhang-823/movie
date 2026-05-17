@@ -1,9 +1,9 @@
 package com.example.movie.repository;
 
 import com.example.movie.entity.Movie;
-import com.example.movie.entity.Person;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -14,6 +14,10 @@ import java.util.Optional;
 public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecificationExecutor<Movie> {
     Page<Movie> findByTitleContainingIgnoreCase(String title, Pageable pageable);
     Optional<Movie> findByTmdbId(Long tmdbId);
+
+    @EntityGraph(attributePaths = {"genres", "companies", "countries"})
+    @Query("SELECT m FROM Movie m WHERE m.id = :id")
+    Optional<Movie> findDetailById(@Param("id") Long id);
 
     @Query("""
         SELECT m FROM Movie m

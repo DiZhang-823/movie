@@ -56,7 +56,7 @@ const errorMessage = ref('')
 const keyword = ref('')
 
 const page = ref(0)
-const size = ref(50)
+const size = ref(20)
 const totalPages = ref(0)
 const totalElements = ref(0)
 
