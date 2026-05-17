@@ -2,7 +2,11 @@ package com.example.movie.specification;
 
 import com.example.movie.entity.Country;
 import com.example.movie.entity.Movie;
+import com.example.movie.entity.UserMovie;
+import com.example.movie.enums.UserMovieStatus;
 import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 import jakarta.persistence.criteria.JoinType;
@@ -50,6 +54,37 @@ public class MovieSpecifications {
             }
 
             return cb.equal(countryJoin.get("code"), regionCode);
+        };
+    }
+
+    public static Specification<Movie> hasUserMovieStatus(Long userId, UserMovieStatus status) {
+        return (root, query, cb) -> {
+            assert query != null;
+
+            Subquery<Long> subquery = query.subquery(Long.class);
+            Root<UserMovie> userMovieRoot = subquery.from(UserMovie.class);
+
+            subquery.select(userMovieRoot.get("movie").get("id"))
+                    .where(
+                            cb.equal(userMovieRoot.get("user").get("id"), userId),
+                            cb.equal(userMovieRoot.get("status"), status)
+                    );
+
+            return root.get("id").in(subquery);
+        };
+    }
+
+    public static Specification<Movie> hasNoUserMovieMark(Long userId) {
+        return (root, query, cb) -> {
+            assert query != null;
+
+            Subquery<Long> subquery = query.subquery(Long.class);
+            Root<UserMovie> userMovieRoot = subquery.from(UserMovie.class);
+
+            subquery.select(userMovieRoot.get("movie").get("id"))
+                    .where(cb.equal(userMovieRoot.get("user").get("id"), userId));
+
+            return cb.not(root.get("id").in(subquery));
         };
     }
 }

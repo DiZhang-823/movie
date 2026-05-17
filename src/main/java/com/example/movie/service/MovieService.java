@@ -3,6 +3,8 @@ package com.example.movie.service;
 import com.example.movie.dto.*;
 import com.example.movie.entity.*;
 import com.example.movie.enums.MovieSortField;
+import com.example.movie.enums.UserMovieStatus;
+import com.example.movie.enums.UserMovieStatusFilter;
 import com.example.movie.exception.ResourceNotFoundException;
 import com.example.movie.repository.*;
 import com.example.movie.specification.MovieSpecifications;
@@ -181,6 +183,7 @@ public class MovieService {
 
     public PageResponse<MovieResponse> getMovies(
             MovieQuery movieQuery,
+            Long currentUserId,
             int page, int size, String sortBy, String direction) {
         if (page < 0) {
             throw new IllegalArgumentException("Page number cannot be less than 0");
@@ -208,6 +211,14 @@ public class MovieService {
         }
         if (movieQuery.getRegionCode() != null && !movieQuery.getRegionCode().isBlank()) {
             spec = spec.and(MovieSpecifications.hasRegion(movieQuery.getRegionCode()));
+        }
+        if (movieQuery.getUserMovieStatus() != null && currentUserId != null) {
+            if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.UNMARKED) {
+                spec = spec.and(MovieSpecifications.hasNoUserMovieMark(currentUserId));
+            } else {
+                UserMovieStatus status = UserMovieStatus.valueOf(movieQuery.getUserMovieStatus().name());
+                spec = spec.and(MovieSpecifications.hasUserMovieStatus(currentUserId, status));
+            }
         }
 
         Page<Movie> moviePage = movieRepository.findAll(spec, pageable);

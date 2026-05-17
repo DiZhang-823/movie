@@ -27,6 +27,7 @@ export interface GetMoviesParams {
     genreId?: number
     year?: number
     regionCode?: string
+    userMovieStatus?: 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
     page?: number
     size?: number
     sortBy?: string
@@ -80,6 +81,10 @@ export async function getMovies(params: GetMoviesParams): Promise<MoviePageRespo
 
     if (params.regionCode !== undefined) {
         searchParams.set('regionCode', String(params.regionCode))
+    }
+
+    if (params.userMovieStatus !== undefined) {
+        searchParams.set('userMovieStatus', params.userMovieStatus)
     }
 
     searchParams.set('page', String(params.page ?? 0))

@@ -1,7 +1,10 @@
 package com.example.movie.controller;
 
 import com.example.movie.dto.*;
+import com.example.movie.entity.User;
+import com.example.movie.enums.UserMovieStatusFilter;
 import com.example.movie.exception.ResourceNotFoundException;
+import com.example.movie.repository.UserRepository;
 import com.example.movie.service.MovieService;
 import com.example.movie.tmdb.dto.TmdbMovieResponse;
 import com.example.movie.tmdb.dto.TmdbPersonResponse;
@@ -18,9 +21,11 @@ import org.springframework.web.bind.annotation.*;
 public class MovieController {
 
     private final MovieService movieService;
+    private final UserRepository userRepository;
 
-    public MovieController(MovieService movieService) {
+    public MovieController(MovieService movieService, UserRepository userRepository) {
         this.movieService = movieService;
+        this.userRepository = userRepository;
     }
 
     // 直接看 TMDB 返回结果，不保存数据库
@@ -42,18 +47,32 @@ public class MovieController {
             @RequestParam(required = false) Long genreId,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String regionCode,
+            @RequestParam(required = false) UserMovieStatusFilter userMovieStatus,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(defaultValue = "ID") String sortBy,
-            @RequestParam(defaultValue = "asc") String direction
+            @RequestParam(defaultValue = "asc") String direction,
+            org.springframework.security.core.Authentication authentication
 
     ) {
+        Long currentUserId = null;
+        if (userMovieStatus != null) {
+            if (authentication == null || "anonymousUser".equals(authentication.getName())) {
+                return ResponseEntity.status(401).build();
+            }
+
+            User user = userRepository.findByUsername(authentication.getName())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            currentUserId = user.getId();
+        }
+
         MovieQuery movieQuery = new MovieQuery();
         movieQuery.setTitle(title);
         movieQuery.setGenreId(genreId);
         movieQuery.setYear(year);
         movieQuery.setRegionCode(regionCode);
-        return ResponseEntity.ok(movieService.getMovies(movieQuery, page, size, sortBy, direction));
+        movieQuery.setUserMovieStatus(userMovieStatus);
+        return ResponseEntity.ok(movieService.getMovies(movieQuery, currentUserId, page, size, sortBy, direction));
     }
 
 //    @Operation(summary = "addMovie: Add a new movie")

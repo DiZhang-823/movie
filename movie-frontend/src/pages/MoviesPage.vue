@@ -2,6 +2,9 @@
 import { onMounted, ref, computed } from 'vue'
 import { getMovies, type MovieItem } from '../api/movie'
 import { getGenres } from '../api/genre'
+import { isLoggedIn } from '../utils/auth'
+
+type UserMovieStatusFilter = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
 
 const categories = ref<{ id: number | null; name: string }[]>([
   { id: null, name: '全部' }
@@ -49,6 +52,19 @@ const selectedSort = ref({
   direction: 'desc',
   name: '默认'
 })
+
+const userMovieStatusOptions = ref<{ value: UserMovieStatusFilter | null; name: string }[]>([
+  { value: null, name: '全部' },
+  { value: 'WANT_TO_WATCH', name: '想看' },
+  { value: 'WATCHED', name: '看过' },
+  { value: 'NOT_INTERESTED', name: '不想看' },
+  { value: 'UNMARKED', name: '未标记' }
+])
+const selectedUserMovieStatus = ref<{ value: UserMovieStatusFilter | null; name: string }>({
+  value: null,
+  name: '全部'
+})
+const isUserLoggedIn = ref(isLoggedIn())
 
 const movies = ref<MovieItem[]>([])
 const loading = ref(false)
@@ -120,6 +136,7 @@ async function loadMovies() {
       genreId: selectedCategory.value.id ?? undefined,
       year: selectedYear.value ?? undefined,
       regionCode: selectedRegion.value.code ?? undefined,
+      userMovieStatus: isUserLoggedIn.value ? selectedUserMovieStatus.value.value ?? undefined : undefined,
       page: page.value,
       size: size.value,
       sortBy: selectedSort.value.sortBy,
@@ -153,6 +170,11 @@ function handleYearChange() {
 
 function handleSortClick(sort: { sortBy: string; direction: string; name: string }) {
   selectedSort.value = sort
+  resetPageAndLoadMovies()
+}
+
+function handleUserMovieStatusClick(status: { value: UserMovieStatusFilter | null; name: string }) {
+  selectedUserMovieStatus.value = status
   resetPageAndLoadMovies()
 }
 
@@ -238,6 +260,7 @@ function resetPageAndLoadMovies() {
 }
 
 onMounted(async () => {
+  isUserLoggedIn.value = isLoggedIn()
   await loadGenres()
   initYears()
   await loadMovies()
@@ -292,6 +315,20 @@ onMounted(async () => {
         </div>
       </div>
 
+      <div v-if="isUserLoggedIn" class="filter-row">
+        <span class="label">我的状态：</span>
+        <div class="options">
+          <span
+              v-for="item in userMovieStatusOptions"
+              :key="item.value ?? 'all'"
+              class="option"
+              :class="{ active: selectedUserMovieStatus.value === item.value }"
+              @click="handleUserMovieStatusClick(item)"
+          >
+            {{ item.name }}
+          </span>
+        </div>
+      </div>
     </div>
 
     <div class="toolbar">
