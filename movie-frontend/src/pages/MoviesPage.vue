@@ -394,18 +394,21 @@ onMounted(async () => {
 .filter-row {
   display: flex;
   align-items: flex-start;
+  gap: 8px;
 }
 
 .label {
-  margin-right: 8px;
   font-size: 13px;
   line-height: 28px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .options {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .option {
@@ -413,6 +416,7 @@ onMounted(async () => {
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .option:hover {
@@ -427,6 +431,7 @@ onMounted(async () => {
 .toolbar {
   display: flex;
   gap: 12px;
+  min-width: 0;
 }
 
 .toolbar input {
@@ -467,6 +472,7 @@ onMounted(async () => {
 .summary {
   font-size: 14px;
   color: #666;
+  line-height: 1.6;
 }
 
 .status {
@@ -629,13 +635,121 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .movies-page {
+    gap: 12px;
+  }
+
+  .filter-bar {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .filter-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    margin-bottom: 10px;
+  }
+
+  .filter-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .options::-webkit-scrollbar {
+    display: none;
+  }
+
+  .option {
+    background: #f3f4f6;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .toolbar input,
+  .toolbar select {
+    width: 100%;
+    min-width: 0;
+  }
+
   .movie-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 10px;
+  }
+
+  .poster-wrapper {
+    border-radius: 8px;
+  }
+
+  .movie-meta {
+    margin-top: 8px;
+    display: block;
+    gap: 6px;
   }
 
   .title-year,
   .rating {
-    font-size: 15px;
+    font-size: 14px;
+  }
+
+  .rating {
+    display: inline-flex;
+    margin-top: 2px;
+  }
+
+  .pagination {
+    gap: 6px;
+  }
+
+  .pagination button:first-of-type {
+    order: 1;
+    flex: 1 0 calc(50% - 3px);
+  }
+
+  .pagination button:last-of-type {
+    order: 2;
+    flex: 1 0 calc(50% - 3px);
+  }
+
+  .page-item {
+    order: 3;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  .pagination button {
+    height: 32px;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+
+  .jump-box {
+    order: 4;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 380px) {
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .title-year,
+  .rating {
+    font-size: 13px;
   }
 }
 </style>

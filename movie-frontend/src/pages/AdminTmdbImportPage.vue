@@ -277,6 +277,14 @@ button:disabled {
 }
 
 @media (max-width: 760px) {
+  .panel {
+    padding: 16px;
+  }
+
+  h1 {
+    font-size: 21px;
+  }
+
   .panel-header,
   .actions,
   .run-form {

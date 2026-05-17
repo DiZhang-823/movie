@@ -102,13 +102,13 @@ onMounted(() => {
 }
 
 .top-nav {
-  height: 64px;
+  min-height: 64px;
   background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
 }
 
 .top-nav .container {
-  height: 100%;
+  min-height: 64px;
   display: flex;
   align-items: center;
   gap: 24px;
@@ -120,6 +120,7 @@ onMounted(() => {
   color: #1677ff;
   flex-shrink: 0;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .nav-menu {
@@ -133,6 +134,7 @@ onMounted(() => {
   color: #333;
   font-size: 16px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .nav-menu a:hover {
@@ -147,6 +149,7 @@ onMounted(() => {
   margin-left: auto;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .login-btn,
@@ -158,6 +161,7 @@ onMounted(() => {
   background: #1677ff;
   color: #fff;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .user-info {
@@ -170,6 +174,10 @@ onMounted(() => {
   font-size: 15px;
   color: #333;
   font-weight: 500;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .main-content {
@@ -177,7 +185,71 @@ onMounted(() => {
 }
 
 .container {
+  width: min(1200px, calc(100% - 32px));
   max-width: 1200px;
   margin: 0 auto;
+}
+
+@media (max-width: 720px) {
+  .top-nav .container {
+    min-height: 0;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 12px 0;
+  }
+
+  .logo {
+    font-size: 20px;
+  }
+
+  .nav-menu {
+    order: 3;
+    width: 100%;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .nav-menu::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-menu a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    font-size: 14px;
+  }
+
+  .nav-menu a.router-link-active {
+    background: #e8f2ff;
+  }
+
+  .user-info {
+    gap: 8px;
+  }
+
+  .user-name {
+    max-width: 96px;
+    font-size: 14px;
+  }
+
+  .login-btn,
+  .logout-btn {
+    height: 34px;
+    padding: 0 12px;
+  }
+
+  .main-content {
+    padding: 14px 0 24px;
+  }
+
+  .container {
+    width: min(100% - 24px, 1200px);
+  }
 }
 </style>

@@ -244,7 +244,7 @@ function goToLogin() {
 }
 
 .register-card {
-  width: 360px;
+  width: min(360px, 100%);
   background: #fff;
   padding: 24px;
   border-radius: 12px;
@@ -323,6 +323,7 @@ button:disabled {
 
 .code-row input {
   flex: 1;
+  min-width: 0;
 }
 
 .send-code-btn {
@@ -346,5 +347,29 @@ button:disabled {
   margin-bottom: 12px;
   font-size: 13px;
   color: #389e0d;
+}
+
+@media (max-width: 480px) {
+  .register-page {
+    min-height: auto;
+    align-items: flex-start;
+    padding: 18px 0;
+  }
+
+  .register-card {
+    padding: 20px;
+    border-radius: 10px;
+  }
+
+  .code-row {
+    gap: 6px;
+  }
+
+  .send-code-btn {
+    width: 96px;
+    padding: 0 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
 }
 </style>

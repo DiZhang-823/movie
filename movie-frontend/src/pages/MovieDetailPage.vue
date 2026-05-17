@@ -585,6 +585,7 @@ onMounted(async () => {
 .movie-detail-card {
   background: #fff;
   border: 1px solid #e5e7eb;
+  border-radius: 8px;
   padding: 24px;
   margin-bottom: 28px;
 }
@@ -814,6 +815,7 @@ onMounted(async () => {
 .movie-action-buttons {
   display: flex;
   gap: 8px;   /* 控制按钮间距 */
+  flex-wrap: wrap;
   margin-top: 12px;
 }
 
@@ -1018,5 +1020,151 @@ onMounted(async () => {
 
 .watched-star-btn.active {
   color: #f3c64d;
+}
+
+@media (max-width: 900px) {
+  .people-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .movie-detail-page {
+    padding: 0 0 20px;
+  }
+
+  .movie-detail-card {
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+
+  .movie-detail {
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .poster-section {
+    width: min(68vw, 260px);
+    margin: 0 auto;
+  }
+
+  .title {
+    margin-bottom: 14px;
+    font-size: 24px;
+  }
+
+  .info-section p {
+    margin-bottom: 8px;
+    line-height: 1.55;
+  }
+
+  .overview-block,
+  .people-block {
+    margin-top: 22px;
+  }
+
+  .overview-block h3,
+  .people-block h3 {
+    font-size: 18px;
+  }
+
+  .people-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .person-card {
+    padding: 6px;
+    border-radius: 8px;
+  }
+
+  .person-info {
+    margin-top: 8px;
+  }
+
+  .person-name {
+    font-size: 13px;
+  }
+
+  .person-role {
+    font-size: 11px;
+  }
+
+  .director-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .director-list .person-card {
+    width: auto;
+  }
+
+  .action-bar {
+    margin-top: 16px;
+  }
+
+  .movie-action-buttons {
+    width: 100%;
+  }
+
+  .status-btn {
+    flex: 1 1 30%;
+    min-width: 96px;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .movie-status-line {
+    gap: 8px;
+  }
+
+  .watched-modal-overlay {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .watched-modal {
+    max-width: none;
+    border-radius: 18px;
+    padding: 24px 18px 18px;
+  }
+
+  .watched-modal-header h3 {
+    font-size: 20px;
+  }
+
+  .watched-star-btn {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 430px) {
+  .poster-section {
+    width: min(76vw, 240px);
+  }
+
+  .title {
+    font-size: 22px;
+  }
+
+  .people-list,
+  .director-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .status-btn {
+    flex-basis: 100%;
+  }
+
+  .watched-modal-actions {
+    gap: 8px;
+  }
+
+  .watched-cancel-btn,
+  .watched-confirm-btn {
+    flex: 1;
+    min-width: 0;
+  }
 }
 </style>

@@ -102,7 +102,7 @@
   }
 
   .login-card {
-    width: 360px;
+    width: min(360px, 100%);
     background: #fff;
     padding: 24px;
     border-radius: 12px;
@@ -172,5 +172,18 @@
 
 .register-tip span:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .login-page {
+    min-height: auto;
+    align-items: flex-start;
+    padding: 24px 0;
+  }
+
+  .login-card {
+    padding: 20px;
+    border-radius: 10px;
+  }
 }
   </style>
