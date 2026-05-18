@@ -6,6 +6,22 @@ export type TmdbImportStatus = {
     updatedAt?: string | null
 }
 
+export type TmdbImportRunItem = {
+    tmdbId: number
+    success: boolean
+    title?: string | null
+    originalTitle?: string | null
+    errorMessage?: string | null
+}
+
+export type TmdbImportRunResult = {
+    startTmdbId: number
+    requestedCount: number
+    successCount: number
+    failureCount: number
+    items: TmdbImportRunItem[]
+}
+
 export async function fetchTmdbImportStatus(): Promise<TmdbImportStatus> {
     const response = await request('/admin/tmdb-import/status')
     if (!response.ok) {
@@ -29,6 +45,18 @@ export async function runTmdbImportOnce(tmdbId: number) {
     const response = await request('/admin/tmdb-import/run-once', {
         method: 'POST',
         body: JSON.stringify({ tmdbId })
+    })
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Failed to run TMDB import')
+    }
+    return await response.json()
+}
+
+export async function runTmdbImportBatch(tmdbId: number, count = 1): Promise<TmdbImportRunResult> {
+    const response = await request('/admin/tmdb-import/run', {
+        method: 'POST',
+        body: JSON.stringify({ tmdbId, count })
     })
     if (!response.ok) {
         const text = await response.text()

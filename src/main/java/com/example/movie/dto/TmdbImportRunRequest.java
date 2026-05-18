@@ -12,4 +12,7 @@ public class TmdbImportRunRequest {
     @NotNull
     @Min(1)
     private Long tmdbId;
+
+    @Min(1)
+    private Integer count = 1;
 }

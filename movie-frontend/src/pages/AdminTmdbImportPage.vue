@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   fetchTmdbImportStatus,
-  runTmdbImportOnce,
+  runTmdbImportBatch,
   setTmdbImportEnabled,
   type TmdbImportStatus
 } from '../api/tmdbImport'
@@ -12,6 +12,7 @@ const loading = ref(false)
 const switching = ref(false)
 const running = ref(false)
 const tmdbId = ref<number | null>(null)
+const importCount = ref(1)
 const message = ref('')
 const errorMessage = ref('')
 
@@ -59,9 +60,13 @@ async function toggleImport() {
   }
 }
 
-async function runOnce() {
+async function runBatch() {
   if (!tmdbId.value || tmdbId.value < 1) {
     errorMessage.value = '请输入有效的 TMDB ID'
+    return
+  }
+  if (!Number.isInteger(importCount.value) || importCount.value < 1) {
+    errorMessage.value = '请输入有效的导入次数'
     return
   }
 
@@ -70,12 +75,22 @@ async function runOnce() {
   errorMessage.value = ''
 
   try {
-    const movie = await runTmdbImportOnce(tmdbId.value)
-    message.value = `已导入：${movie.title || movie.originalTitle || `TMDB ${tmdbId.value}`}`
+    const result = await runTmdbImportBatch(tmdbId.value, importCount.value)
+    const failedIds = result.items
+      .filter((item) => !item.success)
+      .map((item) => item.tmdbId)
+
+    message.value = `已从 TMDB ${result.startTmdbId} 开始导入 ${result.requestedCount} 个，成功 ${result.successCount} 个，失败 ${result.failureCount} 个`
+    if (failedIds.length > 0) {
+      message.value += `。失败 ID：${failedIds.slice(0, 8).join('、')}`
+      if (failedIds.length > 8) {
+        message.value += '...'
+      }
+    }
     await loadStatus()
   } catch (error) {
     console.error(error)
-    errorMessage.value = '手动导入失败，请确认这个 TMDB ID 是否存在'
+    errorMessage.value = '手动导入失败，请确认 TMDB ID 和导入次数是否正确'
   } finally {
     running.value = false
   }
@@ -92,7 +107,7 @@ onMounted(() => {
       <div class="panel-header">
         <div>
           <h1>TMDB 导入管理</h1>
-          <p>查看当前进度，暂停或开启定时导入，也可以手动导入指定电影。</p>
+          <p>查看当前进度，暂停或开启定时导入，也可以手动批量导入指定电影。</p>
         </div>
         <button class="refresh-btn" :disabled="loading" @click="loadStatus">
           {{ loading ? '刷新中' : '刷新' }}
@@ -127,15 +142,28 @@ onMounted(() => {
     </section>
 
     <section class="panel">
-      <h2>手动执行一次</h2>
+      <h2>手动批量导入</h2>
+      <p>从输入的 TMDB ID 开始，按 ID 递增导入指定次数。导入次数默认 1。</p>
       <div class="run-form">
-        <input
-          v-model.number="tmdbId"
-          type="number"
-          min="1"
-          placeholder="输入 TMDB ID"
-        />
-        <button class="primary-btn" :disabled="running" @click="runOnce">
+        <label class="form-field">
+          <span>起始 TMDB ID</span>
+          <input
+            v-model.number="tmdbId"
+            type="number"
+            min="1"
+            placeholder="输入 TMDB ID"
+          />
+        </label>
+        <label class="form-field count-field">
+          <span>导入次数</span>
+          <input
+            v-model.number="importCount"
+            type="number"
+            min="1"
+            placeholder="1"
+          />
+        </label>
+        <button class="primary-btn" :disabled="running" @click="runBatch">
           {{ running ? '导入中' : '立即导入' }}
         </button>
       </div>
@@ -218,8 +246,20 @@ p {
 .actions,
 .run-form {
   display: flex;
+  align-items: flex-end;
   gap: 12px;
   margin-top: 18px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.form-field span {
+  color: #4b5563;
+  font-size: 13px;
 }
 
 .run-form input {
@@ -233,6 +273,10 @@ p {
 
 .run-form input:focus {
   border-color: #1677ff;
+}
+
+.count-field input {
+  width: 130px;
 }
 
 button {
@@ -295,7 +339,12 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .form-field {
+    width: 100%;
+  }
+
   .run-form input,
+  .count-field input,
   button {
     width: 100%;
   }

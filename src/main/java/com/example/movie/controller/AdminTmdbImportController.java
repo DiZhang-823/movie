@@ -1,6 +1,7 @@
 package com.example.movie.controller;
 
 import com.example.movie.dto.TmdbImportRunRequest;
+import com.example.movie.dto.TmdbImportRunResponse;
 import com.example.movie.dto.TmdbImportStatusResponse;
 import com.example.movie.dto.TmdbImportSwitchRequest;
 import com.example.movie.service.TmdbImportAdminService;
@@ -36,5 +37,10 @@ public class AdminTmdbImportController {
     @PostMapping("/run-once")
     public TmdbMovieResponse runOnce(@Valid @RequestBody TmdbImportRunRequest request) {
         return tmdbImportAdminService.runOnce(request.getTmdbId());
+    }
+
+    @PostMapping("/run")
+    public TmdbImportRunResponse run(@Valid @RequestBody TmdbImportRunRequest request) {
+        return tmdbImportAdminService.runBatch(request.getTmdbId(), request.getCount());
     }
 }
