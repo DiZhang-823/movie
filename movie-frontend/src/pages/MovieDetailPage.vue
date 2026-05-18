@@ -40,21 +40,7 @@ const watchedDay = ref(new Date().getDate())
 
 const hoveredRating = ref<number | null>(null)
 
-const dateYearOptions = computed(() => {
-  const currentYear = new Date().getFullYear()
-  const options: number[] = []
-
-  for (let year = currentYear; year >= 1900; year--) {
-    options.push(year)
-  }
-
-  return options
-})
-const dateMonthOptions = Array.from({ length: 12 }, (_, index) => index + 1)
-const dateDayOptions = computed(() => {
-  const totalDays = getDaysInMonth(watchedYear.value, watchedMonth.value)
-  return Array.from({ length: totalDays }, (_, index) => index + 1)
-})
+const watchedDateDisplay = computed(() => buildWatchedDateValue().replaceAll('-', '/'))
 
 async function loadMovieDetail() {
   loading.value = true
@@ -152,6 +138,26 @@ function buildWatchedDateValue() {
     String(watchedMonth.value).padStart(2, '0'),
     String(watchedDay.value).padStart(2, '0')
   ].join('-')
+}
+
+function openNativeDatePicker(event: MouseEvent) {
+  const picker = (event.currentTarget as HTMLElement).querySelector<HTMLInputElement>('input[type="date"]')
+  if (!picker) {
+    return
+  }
+
+  if (typeof picker.showPicker === 'function') {
+    picker.showPicker()
+  } else {
+    picker.click()
+  }
+}
+
+function handleNativeDateChange(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  if (value) {
+    setWatchedDateParts(value)
+  }
 }
 
 async function handleWantToWatch() {
@@ -481,22 +487,17 @@ onMounted(async () => {
 
       <div class="watched-form-section">
         <label class="watched-label">观看日期</label>
-        <div class="watched-date-selects">
-          <select v-model.number="watchedYear">
-            <option v-for="year in dateYearOptions" :key="year" :value="year">
-              {{ year }}年
-            </option>
-          </select>
-          <select v-model.number="watchedMonth">
-            <option v-for="month in dateMonthOptions" :key="month" :value="month">
-              {{ String(month).padStart(2, '0') }}月
-            </option>
-          </select>
-          <select v-model.number="watchedDay">
-            <option v-for="day in dateDayOptions" :key="day" :value="day">
-              {{ String(day).padStart(2, '0') }}日
-            </option>
-          </select>
+        <div class="watched-date-input-shell" @click.stop="openNativeDatePicker">
+          <button type="button" class="watched-date-display-button">
+            {{ watchedDateDisplay }}
+          </button>
+          <button type="button" class="watched-date-picker-button" aria-label="选择观看日期"></button>
+          <input
+            class="native-date-input"
+            type="date"
+            :value="buildWatchedDateValue()"
+            @change="handleNativeDateChange"
+          />
         </div>
       </div>
 
@@ -1017,29 +1018,71 @@ onMounted(async () => {
   color: #333;
 }
 
-.watched-date-selects {
+.watched-date-input-shell {
+  position: relative;
   display: grid;
-  grid-template-columns: 1.15fr 0.9fr 0.9fr;
-  gap: 10px;
-}
-
-.watched-date-selects select {
+  grid-template-columns: minmax(0, 1fr) 44px;
   width: 100%;
   height: 44px;
-  padding: 0 14px;
   border: 1px solid #e3e3e3;
   border-radius: 12px;
-  font-size: 14px;
-  color: #333;
   background: #fff;
   box-sizing: border-box;
+  overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.watched-date-selects select:focus {
-  outline: none;
+.watched-date-input-shell:focus-within {
   border-color: #8fdc86;
   box-shadow: 0 0 0 3px rgba(143, 220, 134, 0.2);
+}
+
+.watched-date-display-button,
+.watched-date-picker-button {
+  border: none;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+}
+
+.watched-date-display-button {
+  min-width: 0;
+  padding: 0 14px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.watched-date-picker-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.watched-date-picker-button::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.watched-date-picker-button::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  width: 14px;
+  border-top: 2px solid currentColor;
+}
+
+.native-date-input {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .watched-modal-actions {
