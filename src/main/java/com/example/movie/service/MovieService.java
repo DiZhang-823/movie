@@ -192,10 +192,18 @@ public class MovieService {
             throw new IllegalArgumentException("Page size must be between 1 and 100");
         }
 
-        Sort sort = Sort.by(
-                Sort.Direction.fromString(direction),
-                MovieSortField.valueOf(sortBy).getField()
+        MovieSortField requestedSortField = MovieSortField.valueOf(sortBy);
+        Sort.Direction requestedDirection = Sort.Direction.fromString(direction);
+        boolean useUserMovieDefaultSort = shouldUseUserMovieDefaultSort(
+                movieQuery,
+                currentUserId,
+                requestedSortField,
+                requestedDirection
         );
+
+        Sort sort = useUserMovieDefaultSort
+                ? Sort.unsorted()
+                : Sort.by(requestedDirection, requestedSortField.getField());
 
         Pageable pageable = PageRequest.of(page, size, sort);
 
@@ -217,7 +225,9 @@ public class MovieService {
                 spec = spec.and(MovieSpecifications.hasNoUserMovieMark(currentUserId));
             } else {
                 UserMovieStatus status = UserMovieStatus.valueOf(movieQuery.getUserMovieStatus().name());
-                spec = spec.and(MovieSpecifications.hasUserMovieStatus(currentUserId, status));
+                spec = spec.and(useUserMovieDefaultSort
+                        ? MovieSpecifications.hasUserMovieStatusOrderByUserTime(currentUserId, status)
+                        : MovieSpecifications.hasUserMovieStatus(currentUserId, status));
             }
         }
 
@@ -249,6 +259,22 @@ public class MovieService {
         Movie movie = movieRepository.findDetailById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
         return this.convertToDetailResponse(movie);
+    }
+
+    private boolean shouldUseUserMovieDefaultSort(
+            MovieQuery movieQuery,
+            Long currentUserId,
+            MovieSortField requestedSortField,
+            Sort.Direction requestedDirection) {
+        if (currentUserId == null || movieQuery.getUserMovieStatus() == null) {
+            return false;
+        }
+        if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.UNMARKED) {
+            return false;
+        }
+
+        return (requestedSortField == MovieSortField.CREATED_AT && requestedDirection == Sort.Direction.DESC)
+                || (requestedSortField == MovieSortField.ID && requestedDirection == Sort.Direction.ASC);
     }
 
 //    public void deleteMovie(Long id) {

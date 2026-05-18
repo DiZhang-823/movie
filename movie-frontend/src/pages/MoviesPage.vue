@@ -175,6 +175,7 @@ function handleSortClick(sort: { sortBy: string; direction: string; name: string
 
 function handleUserMovieStatusClick(status: { value: UserMovieStatusFilter | null; name: string }) {
   selectedUserMovieStatus.value = status
+  selectedSort.value = sortOptions.value[0]
   resetPageAndLoadMovies()
 }
 
