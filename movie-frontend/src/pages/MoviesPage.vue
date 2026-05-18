@@ -260,6 +260,45 @@ function getTodayString() {
   return `${year}-${month}-${day}`
 }
 
+function formatDateForEditor(dateStr: string | null) {
+  if (!dateStr) {
+    return ''
+  }
+
+  return dateStr.slice(0, 10).replaceAll('-', '/')
+}
+
+function normalizeEditorDate(dateStr: string) {
+  const value = dateStr.trim().replaceAll('-', '/')
+  if (!value) {
+    return null
+  }
+
+  const match = value.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
+  if (!match) {
+    throw new Error('INVALID_DATE_FORMAT')
+  }
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    throw new Error('INVALID_DATE_FORMAT')
+  }
+
+  return [
+    String(year).padStart(4, '0'),
+    String(month).padStart(2, '0'),
+    String(day).padStart(2, '0')
+  ].join('-')
+}
+
 function closeActionPanels() {
   activeActionMovieId.value = null
   watchedEditorMovieId.value = null
@@ -274,7 +313,7 @@ function openWatchedEditor(movie: MovieItem) {
   activeActionMovieId.value = null
   watchedEditorMovieId.value = movie.id
   watchedRating.value = movie.userRating ?? null
-  watchedDate.value = movie.userWatchedDate ?? getTodayString()
+  watchedDate.value = formatDateForEditor(movie.userWatchedDate ?? getTodayString())
 }
 
 async function saveMovieStatus(movieId: number, data: UserMovieRequest) {
@@ -307,10 +346,19 @@ async function handleQuickStatus(movie: MovieItem, status: UserMovieStatus) {
 }
 
 async function confirmWatchedStatus(movieId: number) {
+  let normalizedWatchedDate: string | null
+
+  try {
+    normalizedWatchedDate = normalizeEditorDate(watchedDate.value)
+  } catch (error) {
+    window.alert('看过日期格式请填写为 年/月/日，例如 2026/05/18')
+    return
+  }
+
   await saveMovieStatus(movieId, {
     status: 'WATCHED',
     rating: watchedRating.value,
-    watchedDate: watchedDate.value || null
+    watchedDate: normalizedWatchedDate
   })
 }
 
@@ -531,7 +579,12 @@ onBeforeUnmount(() => {
             </div>
             <label class="watched-editor-field">
               <span>看过日期</span>
-              <input v-model="watchedDate" type="date" />
+              <input
+                v-model="watchedDate"
+                type="text"
+                inputmode="numeric"
+                placeholder="2026/05/18"
+              />
             </label>
             <div class="watched-editor-actions">
               <button type="button" class="cancel-btn" @click="closeActionPanels">取消</button>
