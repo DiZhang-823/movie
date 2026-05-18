@@ -11,6 +11,8 @@ export interface MovieItem {
     voteCount: number | null
     posterPath: string | null
     createdAt: string
+    userRating: number | null
+    userWatchedDate: string | null
 }
 
 export interface MoviePageResponse {

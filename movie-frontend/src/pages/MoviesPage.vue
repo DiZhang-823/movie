@@ -238,6 +238,13 @@ function getPosterUrl(path: string | null) {
   return `https://image.tmdb.org/t/p/w500${path}`
 }
 
+function formatWatchedDate(dateStr: string | null) {
+  if (!dateStr) {
+    return ''
+  }
+  return dateStr.slice(0, 10)
+}
+
 function handleKeywordInput() {
   page.value = 0
 
@@ -317,7 +324,7 @@ onMounted(async () => {
       </div>
 
       <div v-if="isUserLoggedIn" class="filter-row">
-        <span class="label">我的状态：</span>
+        <span class="label">状态：</span>
         <div class="options">
           <span
               v-for="item in userMovieStatusOptions"
@@ -384,6 +391,22 @@ onMounted(async () => {
           <div class="rating">
             {{ Number(movie.voteAverage ?? 0).toFixed(2) }}
           </div>
+        </div>
+        <div
+          v-if="selectedUserMovieStatus.value === 'WATCHED' && (movie.userRating != null || movie.userWatchedDate)"
+          class="watched-meta"
+        >
+          <span v-if="movie.userRating != null" class="watched-rating">
+            <span class="watched-star">★</span>
+            我的评分 {{ movie.userRating }}/5
+          </span>
+          <span
+            v-if="movie.userRating != null && movie.userWatchedDate"
+            class="watched-dot"
+          ></span>
+          <span v-if="movie.userWatchedDate" class="watched-date">
+            {{ formatWatchedDate(movie.userWatchedDate) }} 看过
+          </span>
         </div>
       </a>
     </div>
@@ -603,6 +626,38 @@ onMounted(async () => {
   color: #f5a623;
 }
 
+.watched-meta {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 20px;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.watched-rating {
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.watched-star {
+  color: #f5a623;
+}
+
+.watched-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #d1d5db;
+}
+
+.watched-date {
+  color: #6b7280;
+}
+
 /* ===== 分页 ===== */
 .pagination {
   display: flex;
@@ -743,6 +798,12 @@ onMounted(async () => {
   .rating {
     display: inline-flex;
     margin-top: 2px;
+  }
+
+  .watched-meta {
+    margin-top: 4px;
+    font-size: 12px;
+    gap: 5px;
   }
 
   .pagination {

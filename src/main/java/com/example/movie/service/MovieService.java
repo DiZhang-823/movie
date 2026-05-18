@@ -23,7 +23,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class MovieService {
@@ -36,6 +39,7 @@ public class MovieService {
     private final CollectionRepository collectionRepository;
     private final PersonService personService;
     private final MoviePersonRepository moviePersonRepository;
+    private final UserMovieRepository userMovieRepository;
 
     public MovieService(TmdbClient tmdbClient, MovieRepository movieRepository,
                         GenreRepository genreRepository,
@@ -43,7 +47,8 @@ public class MovieService {
                         CountryRepository countryRepository,
                         CollectionRepository collectionRepository,
                         PersonService personService,
-                        MoviePersonRepository moviePersonRepository) {
+                        MoviePersonRepository moviePersonRepository,
+                        UserMovieRepository userMovieRepository) {
         this.tmdbClient = tmdbClient;
         this.movieRepository = movieRepository;
         this.genreRepository = genreRepository;
@@ -52,6 +57,7 @@ public class MovieService {
         this.collectionRepository = collectionRepository;
         this.personService = personService;
         this.moviePersonRepository = moviePersonRepository;
+        this.userMovieRepository = userMovieRepository;
     }
 
     public TmdbMovieResponse fetchMovieByIdFromTmdb(Long movieId) {
@@ -242,8 +248,13 @@ public class MovieService {
 //            moviePage = movieRepository.findAll(pageable);
 //        }
 
-        List<MovieResponse> content = moviePage.getContent()
-                .stream().map(this::convertToResponse).toList();
+        List<Movie> movies = moviePage.getContent();
+        Map<Long, UserMovie> userMoviesByMovieId = getUserMoviesByMovieId(movies, currentUserId, movieQuery);
+
+        List<MovieResponse> content = movies
+                .stream()
+                .map(movie -> convertToResponse(movie, userMoviesByMovieId.get(movie.getId())))
+                .toList();
 
         return  new PageResponse<>(
                 content,
@@ -277,6 +288,23 @@ public class MovieService {
                 || (requestedSortField == MovieSortField.ID && requestedDirection == Sort.Direction.ASC);
     }
 
+    private Map<Long, UserMovie> getUserMoviesByMovieId(
+            List<Movie> movies,
+            Long currentUserId,
+            MovieQuery movieQuery) {
+        if (currentUserId == null
+                || movieQuery.getUserMovieStatus() != UserMovieStatusFilter.WATCHED
+                || movies.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> movieIds = movies.stream().map(Movie::getId).toList();
+
+        return userMovieRepository.findByUserIdAndMovieIds(currentUserId, movieIds)
+                .stream()
+                .collect(Collectors.toMap(userMovie -> userMovie.getMovie().getId(), Function.identity()));
+    }
+
 //    public void deleteMovie(Long id) {
 //        Movie movie = movieRepository.findById(id)
 //                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
@@ -297,6 +325,10 @@ public class MovieService {
 //    }
 
     private MovieResponse convertToResponse(Movie movie) {
+        return convertToResponse(movie, null);
+    }
+
+    private MovieResponse convertToResponse(Movie movie, UserMovie userMovie) {
         MovieResponse response = new MovieResponse();
         response.setId(movie.getId());
         response.setTmdbId(movie.getTmdbId());
@@ -308,6 +340,10 @@ public class MovieService {
         response.setVoteCount(movie.getVoteCount());
         response.setPosterPath(movie.getPosterPath());
         response.setCreatedAt(movie.getCreatedAt());
+        if (userMovie != null) {
+            response.setUserRating(userMovie.getRating());
+            response.setUserWatchedDate(userMovie.getWatchedDate());
+        }
         return response;
     }
 

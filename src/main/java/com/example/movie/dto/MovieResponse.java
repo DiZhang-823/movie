@@ -21,4 +21,6 @@ public class MovieResponse {
     private Integer voteCount;
     private String posterPath;
     private LocalDateTime createdAt;
+    private Byte userRating;
+    private LocalDate userWatchedDate;
 }
