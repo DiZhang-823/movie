@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
 import { getMovies, type MovieItem } from '../api/movie'
 import { getGenres } from '../api/genre'
-import { isLoggedIn } from '../utils/auth'
+import { saveUserMovie, type UserMovieRequest, type UserMovieStatus } from '../api/userMovie'
+import { getToken, isLoggedIn } from '../utils/auth'
 
 type UserMovieStatusFilter = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
 
@@ -75,6 +76,11 @@ const page = ref(0)
 const size = ref(20)
 const totalPages = ref(0)
 const totalElements = ref(0)
+const activeActionMovieId = ref<number | null>(null)
+const watchedEditorMovieId = ref<number | null>(null)
+const watchedRating = ref<number | null>(null)
+const watchedDate = ref('')
+const savingMovieId = ref<number | null>(null)
 
 let searchTimer: number | undefined
 
@@ -245,6 +251,69 @@ function formatWatchedDate(dateStr: string | null) {
   return dateStr.slice(0, 10)
 }
 
+function getTodayString() {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function closeActionPanels() {
+  activeActionMovieId.value = null
+  watchedEditorMovieId.value = null
+}
+
+function toggleActionMenu(movieId: number) {
+  watchedEditorMovieId.value = null
+  activeActionMovieId.value = activeActionMovieId.value === movieId ? null : movieId
+}
+
+function openWatchedEditor(movie: MovieItem) {
+  activeActionMovieId.value = null
+  watchedEditorMovieId.value = movie.id
+  watchedRating.value = movie.userRating ?? null
+  watchedDate.value = movie.userWatchedDate ?? getTodayString()
+}
+
+async function saveMovieStatus(movieId: number, data: UserMovieRequest) {
+  const token = getToken()
+  if (!token || savingMovieId.value !== null) {
+    return
+  }
+
+  savingMovieId.value = movieId
+
+  try {
+    await saveUserMovie(movieId, data, token)
+    closeActionPanels()
+    await loadMovies()
+  } catch (error) {
+    console.error(error)
+    window.alert('保存电影状态失败，请稍后再试')
+  } finally {
+    savingMovieId.value = null
+  }
+}
+
+async function handleQuickStatus(movie: MovieItem, status: UserMovieStatus) {
+  if (status === 'WATCHED') {
+    openWatchedEditor(movie)
+    return
+  }
+
+  await saveMovieStatus(movie.id, { status })
+}
+
+async function confirmWatchedStatus(movieId: number) {
+  await saveMovieStatus(movieId, {
+    status: 'WATCHED',
+    rating: watchedRating.value,
+    watchedDate: watchedDate.value || null
+  })
+}
+
 function handleKeywordInput() {
   page.value = 0
 
@@ -268,10 +337,15 @@ function resetPageAndLoadMovies() {
 }
 
 onMounted(async () => {
+  document.addEventListener('click', closeActionPanels)
   isUserLoggedIn.value = isLoggedIn()
   await loadGenres()
   initYears()
   await loadMovies()
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeActionPanels)
 })
 </script>
 
@@ -372,43 +446,134 @@ onMounted(async () => {
 
     <div v-else class="movie-list">
 <!--      <div v-for="movie in movies" :key="movie.id" class="movie-card" @click="goToDetail(movie.id)">-->
-      <a v-for="movie in movies" :key="movie.id" class="movie-card"
-         :href="`/movies/${movie.id}`" target="_blank">
-        <div class="poster-wrapper">
-          <img
-              v-if="movie.posterPath"
-              :src="getPosterUrl(movie.posterPath)"
-              :alt="movie.title"
-              class="poster"
-          />
-          <div v-else class="poster placeholder">No Image</div>
+      <div
+        v-for="movie in movies"
+        :key="movie.id"
+        class="movie-card"
+        :class="{ actionOpen: activeActionMovieId === movie.id || watchedEditorMovieId === movie.id }"
+      >
+        <div class="poster-shell">
+          <a class="poster-link" :href="`/movies/${movie.id}`" target="_blank">
+            <div class="poster-wrapper">
+              <img
+                  v-if="movie.posterPath"
+                  :src="getPosterUrl(movie.posterPath)"
+                  :alt="movie.title"
+                  class="poster"
+              />
+              <div v-else class="poster placeholder">No Image</div>
+            </div>
+          </a>
+
+          <button
+            v-if="isUserLoggedIn"
+            type="button"
+            class="poster-action-button"
+            :class="{ active: activeActionMovieId === movie.id || watchedEditorMovieId === movie.id }"
+            aria-label="标记电影"
+            @click.stop="toggleActionMenu(movie.id)"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          <div
+            v-if="activeActionMovieId === movie.id"
+            class="movie-action-menu"
+            @click.stop
+          >
+            <button
+              type="button"
+              :disabled="savingMovieId === movie.id"
+              @click="handleQuickStatus(movie, 'WANT_TO_WATCH')"
+            >
+              <span class="action-icon">＋</span>
+              想看
+            </button>
+            <button
+              type="button"
+              :disabled="savingMovieId === movie.id"
+              @click="handleQuickStatus(movie, 'WATCHED')"
+            >
+              <span class="action-icon">✓</span>
+              看过
+            </button>
+            <button
+              type="button"
+              :disabled="savingMovieId === movie.id"
+              @click="handleQuickStatus(movie, 'NOT_INTERESTED')"
+            >
+              <span class="action-icon">－</span>
+              不想看
+            </button>
+          </div>
+
+          <div
+            v-if="watchedEditorMovieId === movie.id"
+            class="watched-editor-popover"
+            @click.stop
+          >
+            <div class="watched-editor-title">标记看过</div>
+            <div class="watched-editor-field">
+              <span>我的评分</span>
+              <div class="watched-rating-picker">
+                <button
+                  v-for="star in 5"
+                  :key="star"
+                  type="button"
+                  :class="{ selected: watchedRating !== null && star <= watchedRating }"
+                  @click="watchedRating = star"
+                >
+                  ★
+                </button>
+              </div>
+            </div>
+            <label class="watched-editor-field">
+              <span>看过日期</span>
+              <input v-model="watchedDate" type="date" />
+            </label>
+            <div class="watched-editor-actions">
+              <button type="button" class="cancel-btn" @click="closeActionPanels">取消</button>
+              <button
+                type="button"
+                class="save-btn"
+                :disabled="savingMovieId === movie.id"
+                @click="confirmWatchedStatus(movie.id)"
+              >
+                {{ savingMovieId === movie.id ? '保存中' : '保存' }}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="movie-meta">
-          <div class="title-year">
-            {{ movie.title }}<span v-if="movie.releaseDate"> ({{ movie.releaseDate.slice(0, 4) }})</span>
+        <a class="movie-info-link" :href="`/movies/${movie.id}`" target="_blank">
+          <div class="movie-meta">
+            <div class="title-year">
+              {{ movie.title }}<span v-if="movie.releaseDate"> ({{ movie.releaseDate.slice(0, 4) }})</span>
+            </div>
+            <div class="rating">
+              {{ Number(movie.voteAverage ?? 0).toFixed(2) }}
+            </div>
           </div>
-          <div class="rating">
-            {{ Number(movie.voteAverage ?? 0).toFixed(2) }}
+          <div
+            v-if="selectedUserMovieStatus.value === 'WATCHED' && (movie.userRating != null || movie.userWatchedDate)"
+            class="watched-meta"
+          >
+            <span v-if="movie.userRating != null" class="watched-rating">
+              <span class="watched-star">★</span>
+              我的评分 {{ movie.userRating }}/5
+            </span>
+            <span
+              v-if="movie.userRating != null && movie.userWatchedDate"
+              class="watched-dot"
+            ></span>
+            <span v-if="movie.userWatchedDate" class="watched-date">
+              {{ formatWatchedDate(movie.userWatchedDate) }} 看过
+            </span>
           </div>
-        </div>
-        <div
-          v-if="selectedUserMovieStatus.value === 'WATCHED' && (movie.userRating != null || movie.userWatchedDate)"
-          class="watched-meta"
-        >
-          <span v-if="movie.userRating != null" class="watched-rating">
-            <span class="watched-star">★</span>
-            我的评分 {{ movie.userRating }}/5
-          </span>
-          <span
-            v-if="movie.userRating != null && movie.userWatchedDate"
-            class="watched-dot"
-          ></span>
-          <span v-if="movie.userWatchedDate" class="watched-date">
-            {{ formatWatchedDate(movie.userWatchedDate) }} 看过
-          </span>
-        </div>
-      </a>
+        </a>
+      </div>
     </div>
 
     <div class="pagination">
@@ -553,21 +718,34 @@ onMounted(async () => {
 }
 
 .movie-card {
-  text-decoration: none;
   color: inherit;
   display: block;
-  flex-direction: column;
-  cursor: pointer;
   background: transparent;
   border: none;
   box-shadow: none;
   padding: 0;
   min-width: 0;
+  position: relative;
   transition: transform 0.2s ease;
 }
 
 .movie-card:hover {
   transform: translateY(-4px);
+}
+
+.movie-card.actionOpen {
+  z-index: 20;
+}
+
+.poster-shell {
+  position: relative;
+}
+
+.poster-link,
+.movie-info-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
 }
 
 .poster-wrapper {
@@ -577,6 +755,188 @@ onMounted(async () => {
   border-radius: 10px;
   background: #eaeaea;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.poster-action-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(17, 24, 39, 0.62);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.movie-card:hover .poster-action-button,
+.poster-action-button.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.poster-action-button:hover,
+.poster-action-button.active {
+  background: rgba(22, 119, 255, 0.9);
+}
+
+.poster-action-button span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.movie-action-menu,
+.watched-editor-popover {
+  position: absolute;
+  top: 42px;
+  right: 8px;
+  z-index: 5;
+  background: #fff;
+  border: 1px solid rgba(229, 231, 235, 0.95);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.movie-action-menu {
+  width: 128px;
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.movie-action-menu button {
+  width: 100%;
+  min-height: 34px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.movie-action-menu button:hover {
+  background: #eef5ff;
+  color: #1677ff;
+}
+
+.movie-action-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.action-icon {
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.watched-editor-popover {
+  width: 220px;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.watched-editor-title {
+  margin-bottom: 10px;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.watched-editor-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.watched-rating-picker {
+  display: flex;
+  gap: 2px;
+}
+
+.watched-rating-picker button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}
+
+.watched-rating-picker button:hover,
+.watched-rating-picker button.selected {
+  color: #f5a623;
+}
+
+.watched-editor-field input {
+  width: 100%;
+  height: 32px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  padding: 0 8px;
+  color: #111827;
+  outline: none;
+}
+
+.watched-editor-field input:focus {
+  border-color: #1677ff;
+}
+
+.watched-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.watched-editor-actions button {
+  height: 30px;
+  border-radius: 5px;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cancel-btn {
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  color: #4b5563;
+}
+
+.save-btn {
+  border: 1px solid #1677ff;
+  background: #1677ff;
+  color: #fff;
+}
+
+.save-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .poster {
@@ -782,6 +1142,19 @@ onMounted(async () => {
 
   .poster-wrapper {
     border-radius: 8px;
+  }
+
+  .poster-action-button {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .movie-action-menu {
+    width: 120px;
+  }
+
+  .watched-editor-popover {
+    width: min(220px, calc(100vw - 32px));
   }
 
   .movie-meta {
