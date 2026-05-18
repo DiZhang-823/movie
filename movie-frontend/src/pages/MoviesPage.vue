@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, computed } from 'vue'
+import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { getMovies, type MovieItem } from '../api/movie'
 import { getGenres } from '../api/genre'
 import { saveUserMovie, type UserMovieRequest, type UserMovieStatus } from '../api/userMovie'
@@ -79,12 +79,29 @@ const totalElements = ref(0)
 const activeActionMovieId = ref<number | null>(null)
 const watchedEditorMovieId = ref<number | null>(null)
 const watchedRating = ref<number | null>(null)
-const watchedDate = ref('')
+const watchedYear = ref(new Date().getFullYear())
+const watchedMonth = ref(new Date().getMonth() + 1)
+const watchedDay = ref(new Date().getDate())
 const savingMovieId = ref<number | null>(null)
 
 let searchTimer: number | undefined
 
 const jumpPage = ref('')
+const dateYearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const options: number[] = []
+
+  for (let year = currentYear; year >= 1900; year--) {
+    options.push(year)
+  }
+
+  return options
+})
+const dateMonthOptions = Array.from({ length: 12 }, (_, index) => index + 1)
+const dateDayOptions = computed(() => {
+  const totalDays = getDaysInMonth(watchedYear.value, watchedMonth.value)
+  return Array.from({ length: totalDays }, (_, index) => index + 1)
+})
 const visiblePages = computed(() => {
   const total = totalPages.value
   const current = page.value
@@ -260,42 +277,37 @@ function getTodayString() {
   return `${year}-${month}-${day}`
 }
 
-function formatDateForEditor(dateStr: string | null) {
-  if (!dateStr) {
-    return ''
-  }
-
-  return dateStr.slice(0, 10).replaceAll('-', '/')
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate()
 }
 
-function normalizeEditorDate(dateStr: string) {
-  const value = dateStr.trim().replaceAll('-', '/')
-  if (!value) {
-    return null
-  }
-
-  const match = value.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
-  if (!match) {
-    throw new Error('INVALID_DATE_FORMAT')
-  }
-
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const date = new Date(year, month - 1, day)
+function setWatchedDateParts(dateStr: string | null) {
+  const value = dateStr || getTodayString()
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
 
   if (
-    date.getFullYear() !== year ||
-    date.getMonth() !== month - 1 ||
-    date.getDate() !== day
+    !year ||
+    !month ||
+    !day ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > getDaysInMonth(year, month)
   ) {
-    throw new Error('INVALID_DATE_FORMAT')
+    setWatchedDateParts(getTodayString())
+    return
   }
 
+  watchedYear.value = year
+  watchedMonth.value = month
+  watchedDay.value = day
+}
+
+function buildWatchedDateValue() {
   return [
-    String(year).padStart(4, '0'),
-    String(month).padStart(2, '0'),
-    String(day).padStart(2, '0')
+    String(watchedYear.value).padStart(4, '0'),
+    String(watchedMonth.value).padStart(2, '0'),
+    String(watchedDay.value).padStart(2, '0')
   ].join('-')
 }
 
@@ -313,7 +325,7 @@ function openWatchedEditor(movie: MovieItem) {
   activeActionMovieId.value = null
   watchedEditorMovieId.value = movie.id
   watchedRating.value = movie.userRating ?? null
-  watchedDate.value = formatDateForEditor(movie.userWatchedDate ?? getTodayString())
+  setWatchedDateParts(movie.userWatchedDate)
 }
 
 async function saveMovieStatus(movieId: number, data: UserMovieRequest) {
@@ -346,21 +358,19 @@ async function handleQuickStatus(movie: MovieItem, status: UserMovieStatus) {
 }
 
 async function confirmWatchedStatus(movieId: number) {
-  let normalizedWatchedDate: string | null
-
-  try {
-    normalizedWatchedDate = normalizeEditorDate(watchedDate.value)
-  } catch (error) {
-    window.alert('看过日期格式请填写为 年/月/日，例如 2026/05/18')
-    return
-  }
-
   await saveMovieStatus(movieId, {
     status: 'WATCHED',
     rating: watchedRating.value,
-    watchedDate: normalizedWatchedDate
+    watchedDate: buildWatchedDateValue()
   })
 }
+
+watch([watchedYear, watchedMonth], () => {
+  const maxDay = getDaysInMonth(watchedYear.value, watchedMonth.value)
+  if (watchedDay.value > maxDay) {
+    watchedDay.value = maxDay
+  }
+})
 
 function handleKeywordInput() {
   page.value = 0
@@ -579,12 +589,23 @@ onBeforeUnmount(() => {
             </div>
             <label class="watched-editor-field">
               <span>看过日期</span>
-              <input
-                v-model="watchedDate"
-                type="text"
-                inputmode="numeric"
-                placeholder="2026/05/18"
-              />
+              <div class="date-select-row">
+                <select v-model.number="watchedYear">
+                  <option v-for="year in dateYearOptions" :key="year" :value="year">
+                    {{ year }}年
+                  </option>
+                </select>
+                <select v-model.number="watchedMonth">
+                  <option v-for="month in dateMonthOptions" :key="month" :value="month">
+                    {{ String(month).padStart(2, '0') }}月
+                  </option>
+                </select>
+                <select v-model.number="watchedDay">
+                  <option v-for="day in dateDayOptions" :key="day" :value="day">
+                    {{ String(day).padStart(2, '0') }}日
+                  </option>
+                </select>
+              </div>
             </label>
             <div class="watched-editor-actions">
               <button type="button" class="cancel-btn" @click="closeActionPanels">取消</button>
@@ -946,17 +967,25 @@ onBeforeUnmount(() => {
   color: #f5a623;
 }
 
-.watched-editor-field input {
+.date-select-row {
+  display: grid;
+  grid-template-columns: 1.15fr 0.9fr 0.9fr;
+  gap: 6px;
+}
+
+.date-select-row select {
   width: 100%;
   height: 32px;
   border: 1px solid #dcdfe6;
   border-radius: 6px;
-  padding: 0 8px;
+  padding: 0 6px;
   color: #111827;
+  background: #fff;
   outline: none;
+  font-size: 12px;
 }
 
-.watched-editor-field input:focus {
+.date-select-row select:focus {
   border-color: #1677ff;
 }
 

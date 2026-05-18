@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, nextTick } from 'vue'
+import { onMounted, ref, computed, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getMovieById, type MovieDetail } from '@/api/movie'
 import {getUserMovie, saveUserMovie, type UserMovieResponse} from '@/api/userMovie'
@@ -34,9 +34,27 @@ const userMovie = ref<UserMovieResponse | null>(null)
 
 const showWatchedPanel = ref(false)
 const watchedRating = ref<number | null>(null)
-const watchedDate = ref<string | null>(null)
+const watchedYear = ref(new Date().getFullYear())
+const watchedMonth = ref(new Date().getMonth() + 1)
+const watchedDay = ref(new Date().getDate())
 
 const hoveredRating = ref<number | null>(null)
+
+const dateYearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  const options: number[] = []
+
+  for (let year = currentYear; year >= 1900; year--) {
+    options.push(year)
+  }
+
+  return options
+})
+const dateMonthOptions = Array.from({ length: 12 }, (_, index) => index + 1)
+const dateDayOptions = computed(() => {
+  const totalDays = getDaysInMonth(watchedYear.value, watchedMonth.value)
+  return Array.from({ length: totalDays }, (_, index) => index + 1)
+})
 
 async function loadMovieDetail() {
   loading.value = true
@@ -93,6 +111,49 @@ function updateCastListMaxHeight() {
   castListMaxHeight.value = `${castListRef.value.scrollHeight}px`
 }
 
+function getTodayString() {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate()
+}
+
+function setWatchedDateParts(dateStr: string | null) {
+  const value = dateStr || getTodayString()
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+
+  if (
+    !year ||
+    !month ||
+    !day ||
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > getDaysInMonth(year, month)
+  ) {
+    setWatchedDateParts(getTodayString())
+    return
+  }
+
+  watchedYear.value = year
+  watchedMonth.value = month
+  watchedDay.value = day
+}
+
+function buildWatchedDateValue() {
+  return [
+    String(watchedYear.value).padStart(4, '0'),
+    String(watchedMonth.value).padStart(2, '0'),
+    String(watchedDay.value).padStart(2, '0')
+  ].join('-')
+}
+
 async function handleWantToWatch() {
   const token = localStorage.getItem('token')
   if (!token) return
@@ -121,10 +182,10 @@ function handleWatched() {
   // 如果之前有数据，带出来（编辑场景）
   if (userMovie.value?.status === 'WATCHED') {
     watchedRating.value = userMovie.value.rating
-    watchedDate.value = userMovie.value.watchedDate
+    setWatchedDateParts(userMovie.value.watchedDate)
   } else {
     watchedRating.value = null
-    watchedDate.value = new Date().toISOString().slice(0, 10)
+    setWatchedDateParts(getTodayString())
   }
 }
 
@@ -137,7 +198,7 @@ async function confirmWatched() {
       {
         status: 'WATCHED',
         rating: watchedRating.value,
-        watchedDate: watchedDate.value
+        watchedDate: buildWatchedDateValue()
       },
       token
     )
@@ -170,6 +231,13 @@ function formatStatusDate(dateStr: string) {
 
   return `${year}-${month}-${day}`
 }
+
+watch([watchedYear, watchedMonth], () => {
+  const maxDay = getDaysInMonth(watchedYear.value, watchedMonth.value)
+  if (watchedDay.value > maxDay) {
+    watchedDay.value = maxDay
+  }
+})
 
 onMounted(async () => {
   await loadMovieDetail()
@@ -412,8 +480,24 @@ onMounted(async () => {
       </div>
 
       <div class="watched-form-section">
-        <label class="watched-label" for="watched-date">观看日期</label>
-        <input id="watched-date" type="date" v-model="watchedDate" class="watched-date-input" />
+        <label class="watched-label">观看日期</label>
+        <div class="watched-date-selects">
+          <select v-model.number="watchedYear">
+            <option v-for="year in dateYearOptions" :key="year" :value="year">
+              {{ year }}年
+            </option>
+          </select>
+          <select v-model.number="watchedMonth">
+            <option v-for="month in dateMonthOptions" :key="month" :value="month">
+              {{ String(month).padStart(2, '0') }}月
+            </option>
+          </select>
+          <select v-model.number="watchedDay">
+            <option v-for="day in dateDayOptions" :key="day" :value="day">
+              {{ String(day).padStart(2, '0') }}日
+            </option>
+          </select>
+        </div>
       </div>
 
       <div class="watched-modal-actions">
@@ -933,7 +1017,13 @@ onMounted(async () => {
   color: #333;
 }
 
-.watched-date-input {
+.watched-date-selects {
+  display: grid;
+  grid-template-columns: 1.15fr 0.9fr 0.9fr;
+  gap: 10px;
+}
+
+.watched-date-selects select {
   width: 100%;
   height: 44px;
   padding: 0 14px;
@@ -946,7 +1036,7 @@ onMounted(async () => {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.watched-date-input:focus {
+.watched-date-selects select:focus {
   outline: none;
   border-color: #8fdc86;
   box-shadow: 0 0 0 3px rgba(143, 220, 134, 0.2);
