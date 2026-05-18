@@ -50,7 +50,7 @@ public class MovieSpecifications {
                 if (status == UserMovieStatus.WATCHED) {
                     query.orderBy(
                             cb.desc(userMovieRoot.get("watchedDate")),
-                            cb.desc(userMovieRoot.get("updatedAt")),
+                            cb.desc(root.get("releaseDate")),
                             cb.desc(root.get("id"))
                     );
                 } else {
