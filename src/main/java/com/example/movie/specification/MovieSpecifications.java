@@ -6,11 +6,15 @@ import com.example.movie.entity.Movie;
 import com.example.movie.entity.UserMovie;
 import com.example.movie.enums.UserMovieStatus;
 import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 import jakarta.persistence.criteria.JoinType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class MovieSpecifications {
 
@@ -40,7 +44,11 @@ public class MovieSpecifications {
         };
     }
 
-    public static Specification<Movie> hasUserMovieStatusOrderByUserTime(Long userId, UserMovieStatus status) {
+    public static Specification<Movie> hasUserMovieStatusOrderByUserTime(
+            Long userId,
+            UserMovieStatus status,
+            Integer minRating,
+            Integer maxRating) {
         return (root, query, cb) -> {
             assert query != null;
 
@@ -61,11 +69,13 @@ public class MovieSpecifications {
                 }
             }
 
-            return cb.and(
-                    cb.equal(userMovieRoot.get("movie").get("id"), root.get("id")),
-                    cb.equal(userMovieRoot.get("user").get("id"), userId),
-                    cb.equal(userMovieRoot.get("status"), status)
-            );
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(userMovieRoot.get("movie").get("id"), root.get("id")));
+            predicates.add(cb.equal(userMovieRoot.get("user").get("id"), userId));
+            predicates.add(cb.equal(userMovieRoot.get("status"), status));
+            addUserRatingPredicates(predicates, userMovieRoot, status, minRating, maxRating, cb);
+
+            return cb.and(predicates.toArray(Predicate[]::new));
         };
     }
 
@@ -108,18 +118,24 @@ public class MovieSpecifications {
         };
     }
 
-    public static Specification<Movie> hasUserMovieStatus(Long userId, UserMovieStatus status) {
+    public static Specification<Movie> hasUserMovieStatus(
+            Long userId,
+            UserMovieStatus status,
+            Integer minRating,
+            Integer maxRating) {
         return (root, query, cb) -> {
             assert query != null;
 
             Subquery<Long> subquery = query.subquery(Long.class);
             Root<UserMovie> userMovieRoot = subquery.from(UserMovie.class);
 
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(userMovieRoot.get("user").get("id"), userId));
+            predicates.add(cb.equal(userMovieRoot.get("status"), status));
+            addUserRatingPredicates(predicates, userMovieRoot, status, minRating, maxRating, cb);
+
             subquery.select(userMovieRoot.get("movie").get("id"))
-                    .where(
-                            cb.equal(userMovieRoot.get("user").get("id"), userId),
-                            cb.equal(userMovieRoot.get("status"), status)
-                    );
+                    .where(cb.and(predicates.toArray(Predicate[]::new)));
 
             return root.get("id").in(subquery);
         };
@@ -137,5 +153,23 @@ public class MovieSpecifications {
 
             return cb.not(root.get("id").in(subquery));
         };
+    }
+
+    private static void addUserRatingPredicates(
+            List<Predicate> predicates,
+            Root<UserMovie> userMovieRoot,
+            UserMovieStatus status,
+            Integer minRating,
+            Integer maxRating,
+            jakarta.persistence.criteria.CriteriaBuilder cb) {
+        if (status != UserMovieStatus.WATCHED) {
+            return;
+        }
+        if (minRating != null) {
+            predicates.add(cb.greaterThanOrEqualTo(userMovieRoot.get("rating").as(Integer.class), minRating));
+        }
+        if (maxRating != null) {
+            predicates.add(cb.lessThanOrEqualTo(userMovieRoot.get("rating").as(Integer.class), maxRating));
+        }
     }
 }

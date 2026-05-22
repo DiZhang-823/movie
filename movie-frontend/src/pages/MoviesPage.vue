@@ -66,6 +66,8 @@ const selectedUserMovieStatus = ref<{ value: UserMovieStatusFilter | null; name:
   value: null,
   name: '全部'
 })
+const userRatingMin = ref(1)
+const userRatingMax = ref(5)
 const isUserLoggedIn = ref(isLoggedIn())
 
 const movies = ref<MovieItem[]>([])
@@ -89,6 +91,14 @@ let searchTimer: number | undefined
 
 const jumpPage = ref('')
 const watchedDateDisplay = computed(() => buildWatchedDateValue().replaceAll('-', '/'))
+const showUserRatingRange = computed(() =>
+  isUserLoggedIn.value && selectedUserMovieStatus.value.value === 'WATCHED'
+)
+const hasUserRatingRangeFilter = computed(() =>
+  showUserRatingRange.value && (userRatingMin.value !== 1 || userRatingMax.value !== 5)
+)
+const userRatingRangeStart = computed(() => `${((userRatingMin.value - 1) / 4) * 100}%`)
+const userRatingRangeEnd = computed(() => `${100 - ((userRatingMax.value - 1) / 4) * 100}%`)
 const visiblePages = computed(() => {
   const total = totalPages.value
   const current = page.value
@@ -147,6 +157,8 @@ async function loadMovies() {
       year: selectedYear.value ?? undefined,
       regionCode: selectedRegion.value.code ?? undefined,
       userMovieStatus: isUserLoggedIn.value ? selectedUserMovieStatus.value.value ?? undefined : undefined,
+      userRatingMin: hasUserRatingRangeFilter.value ? userRatingMin.value : undefined,
+      userRatingMax: hasUserRatingRangeFilter.value ? userRatingMax.value : undefined,
       page: page.value,
       size: size.value,
       sortBy: selectedSort.value.sortBy,
@@ -186,7 +198,34 @@ function handleSortClick(sort: { sortBy: string; direction: string; name: string
 function handleUserMovieStatusClick(status: { value: UserMovieStatusFilter | null; name: string }) {
   selectedUserMovieStatus.value = status
   selectedSort.value = sortOptions.value[0]
+  if (status.value !== 'WATCHED') {
+    resetUserRatingRange(false)
+  }
   resetPageAndLoadMovies()
+}
+
+function resetUserRatingRange(shouldLoad = true) {
+  userRatingMin.value = 1
+  userRatingMax.value = 5
+  if (shouldLoad && showUserRatingRange.value) {
+    resetPageAndLoadMovies()
+  }
+}
+
+function handleUserRatingMinInput(event: Event) {
+  const value = Number((event.target as HTMLInputElement).value)
+  userRatingMin.value = Math.min(value, userRatingMax.value)
+}
+
+function handleUserRatingMaxInput(event: Event) {
+  const value = Number((event.target as HTMLInputElement).value)
+  userRatingMax.value = Math.max(value, userRatingMin.value)
+}
+
+function handleUserRatingRangeChange() {
+  if (showUserRatingRange.value) {
+    resetPageAndLoadMovies()
+  }
 }
 
 function handleSearch() {
@@ -507,6 +546,67 @@ onBeforeUnmount(() => {
           </span>
         </div>
       </div>
+
+      <div v-if="showUserRatingRange" class="filter-row rating-filter-row">
+        <span class="label">个人评分：</span>
+        <div class="rating-range-panel">
+          <div
+            class="rating-range-control"
+            :style="{
+              '--range-start': userRatingRangeStart,
+              '--range-end': userRatingRangeEnd
+            }"
+          >
+            <div class="rating-range-track">
+              <span
+                v-for="star in 5"
+                :key="star"
+                class="rating-range-tick"
+              ></span>
+            </div>
+            <div class="rating-range-active"></div>
+            <input
+              class="rating-range-input rating-range-min"
+              type="range"
+              min="1"
+              max="5"
+              step="1"
+              :value="userRatingMin"
+              aria-label="最低个人评分"
+              @input="handleUserRatingMinInput"
+              @change="handleUserRatingRangeChange"
+            />
+            <input
+              class="rating-range-input rating-range-max"
+              type="range"
+              min="1"
+              max="5"
+              step="1"
+              :value="userRatingMax"
+              aria-label="最高个人评分"
+              @input="handleUserRatingMaxInput"
+              @change="handleUserRatingRangeChange"
+            />
+          </div>
+          <div class="rating-range-labels">
+            <span
+              v-for="star in 5"
+              :key="star"
+              :class="{ active: star >= userRatingMin && star <= userRatingMax }"
+            >
+              {{ star }}星
+            </span>
+          </div>
+          <button
+            v-if="userRatingMin !== 1 || userRatingMax !== 5"
+            type="button"
+            class="rating-range-reset"
+            @click="resetUserRatingRange()"
+          >
+            重置
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -767,6 +867,171 @@ onBeforeUnmount(() => {
 .option.active {
   background: #1677ff;
   color: #fff;
+}
+
+.rating-filter-row {
+  margin-top: 6px;
+}
+
+.rating-range-panel {
+  display: grid;
+  grid-template-columns: 420px auto;
+  align-items: start;
+  column-gap: 16px;
+  row-gap: 8px;
+  min-width: 0;
+}
+
+.rating-range-control {
+  position: relative;
+  width: 420px;
+  height: 30px;
+  --range-start: 0%;
+  --range-end: 0%;
+}
+
+.rating-range-track,
+.rating-range-active {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 11px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.rating-range-track {
+  background: #e5e7eb;
+}
+
+.rating-range-active {
+  left: var(--range-start);
+  right: var(--range-end);
+  background: #1677ff;
+}
+
+.rating-range-tick {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transform: translate(-50%, -50%);
+}
+
+.rating-range-tick:nth-child(1) {
+  left: 0;
+}
+
+.rating-range-tick:nth-child(2) {
+  left: 25%;
+}
+
+.rating-range-tick:nth-child(3) {
+  left: 50%;
+}
+
+.rating-range-tick:nth-child(4) {
+  left: 75%;
+}
+
+.rating-range-tick:nth-child(5) {
+  left: 100%;
+}
+
+.rating-range-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 30px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+}
+
+.rating-range-input::-webkit-slider-runnable-track {
+  height: 30px;
+  background: transparent;
+}
+
+.rating-range-input::-webkit-slider-thumb {
+  width: 26px;
+  height: 26px;
+  margin-top: 2px;
+  border: 3px solid #1677ff;
+  border-radius: 50%;
+  appearance: none;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.rating-range-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+
+.rating-range-input::-moz-range-track {
+  height: 30px;
+  background: transparent;
+}
+
+.rating-range-input::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #1677ff;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
+  cursor: grab;
+  pointer-events: auto;
+}
+
+.rating-range-labels {
+  grid-column: 1;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  width: 420px;
+  margin-top: -3px;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.rating-range-labels span {
+  text-align: center;
+}
+
+.rating-range-labels span:first-child {
+  text-align: left;
+}
+
+.rating-range-labels span:last-child {
+  text-align: right;
+}
+
+.rating-range-labels .active {
+  color: #111827;
+  font-weight: 700;
+}
+
+.rating-range-reset {
+  grid-column: 2;
+  grid-row: 1;
+  height: 30px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0 14px;
+  background: #f9fafb;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.rating-range-reset:hover {
+  color: #1677ff;
+  border-color: #b7d5ff;
+  background: #f3f8ff;
 }
 
 .toolbar {
@@ -1331,6 +1596,21 @@ onBeforeUnmount(() => {
 
   .option {
     background: #f3f4f6;
+  }
+
+  .rating-range-panel {
+    grid-template-columns: minmax(0, 1fr) auto;
+    width: 100%;
+    column-gap: 10px;
+  }
+
+  .rating-range-control,
+  .rating-range-labels {
+    width: 100%;
+  }
+
+  .rating-range-labels {
+    font-size: 11px;
   }
 
   .toolbar {

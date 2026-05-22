@@ -15,4 +15,8 @@ public class MovieQuery {
     private String regionCode;
 
     private UserMovieStatusFilter userMovieStatus;
+
+    private Integer userRatingMin;
+
+    private Integer userRatingMax;
 }

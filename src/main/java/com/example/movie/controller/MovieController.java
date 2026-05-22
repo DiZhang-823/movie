@@ -48,6 +48,8 @@ public class MovieController {
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String regionCode,
             @RequestParam(required = false) UserMovieStatusFilter userMovieStatus,
+            @RequestParam(required = false) Integer userRatingMin,
+            @RequestParam(required = false) Integer userRatingMax,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(defaultValue = "ID") String sortBy,
@@ -76,6 +78,8 @@ public class MovieController {
         movieQuery.setYear(year);
         movieQuery.setRegionCode(regionCode);
         movieQuery.setUserMovieStatus(userMovieStatus);
+        movieQuery.setUserRatingMin(userRatingMin);
+        movieQuery.setUserRatingMax(userRatingMax);
         return ResponseEntity.ok(movieService.getMovies(movieQuery, currentUserId, page, size, sortBy, direction));
     }
 

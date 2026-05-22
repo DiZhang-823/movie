@@ -232,8 +232,18 @@ public class MovieService {
             } else {
                 UserMovieStatus status = UserMovieStatus.valueOf(movieQuery.getUserMovieStatus().name());
                 spec = spec.and(useUserMovieDefaultSort
-                        ? MovieSpecifications.hasUserMovieStatusOrderByUserTime(currentUserId, status)
-                        : MovieSpecifications.hasUserMovieStatus(currentUserId, status));
+                        ? MovieSpecifications.hasUserMovieStatusOrderByUserTime(
+                                currentUserId,
+                                status,
+                                movieQuery.getUserRatingMin(),
+                                movieQuery.getUserRatingMax()
+                        )
+                        : MovieSpecifications.hasUserMovieStatus(
+                                currentUserId,
+                                status,
+                                movieQuery.getUserRatingMin(),
+                                movieQuery.getUserRatingMax()
+                        ));
             }
         }
 
