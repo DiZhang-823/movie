@@ -78,6 +78,7 @@ const userRatingMax = ref(5)
 const isUserLoggedIn = ref(isLoggedIn())
 const ratingRangeControlRef = ref<HTMLElement | null>(null)
 const ratingRangeDragState = ref<RatingRangeDragState | null>(null)
+const ratingRangePopoverOpen = ref(false)
 
 const movies = ref<MovieItem[]>([])
 const loading = ref(false)
@@ -106,6 +107,14 @@ const showUserRatingRange = computed(() =>
 const hasUserRatingRangeFilter = computed(() =>
   showUserRatingRange.value && (userRatingMin.value !== 1 || userRatingMax.value !== 5)
 )
+const userRatingRangeLabel = computed(() => {
+  if (!hasUserRatingRangeFilter.value) {
+    return '全部'
+  }
+  return userRatingMin.value === userRatingMax.value
+    ? `${userRatingMin.value}星`
+    : `${userRatingMin.value}-${userRatingMax.value}星`
+})
 const userRatingRangeStart = computed(() => `${((userRatingMin.value - 1) / 4) * 100}%`)
 const userRatingRangeEnd = computed(() => `${100 - ((userRatingMax.value - 1) / 4) * 100}%`)
 const visiblePages = computed(() => {
@@ -207,6 +216,7 @@ function handleSortClick(sort: { sortBy: string; direction: string; name: string
 function handleUserMovieStatusClick(status: { value: UserMovieStatusFilter | null; name: string }) {
   selectedUserMovieStatus.value = status
   selectedSort.value = sortOptions.value[0]
+  ratingRangePopoverOpen.value = false
   if (status.value !== 'WATCHED') {
     resetUserRatingRange(false)
   }
@@ -322,6 +332,10 @@ function finishRatingRangeDrag() {
   ) {
     resetPageAndLoadMovies()
   }
+}
+
+function toggleRatingRangePopover() {
+  ratingRangePopoverOpen.value = !ratingRangePopoverOpen.value
 }
 
 function handleRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEvent) {
@@ -506,6 +520,7 @@ function handleNativeDateChange(event: Event) {
 function closeActionPanels() {
   activeActionMovieId.value = null
   watchedEditorMovieId.value = null
+  ratingRangePopoverOpen.value = false
 }
 
 function toggleActionMenu(movieId: number) {
@@ -661,60 +676,80 @@ onBeforeUnmount(() => {
           >
             {{ item.name }}
           </span>
-        </div>
-      </div>
 
-      <div v-if="showUserRatingRange" class="filter-row rating-filter-row">
-        <span class="label">我的评分：</span>
-        <div class="rating-range-panel">
           <div
-            ref="ratingRangeControlRef"
-            class="rating-range-control"
-            :style="{
-              '--range-start': userRatingRangeStart,
-              '--range-end': userRatingRangeEnd
-            }"
-            @pointerdown="startRatingRangeDrag"
+            v-if="showUserRatingRange"
+            class="rating-filter-inline"
+            @click.stop
           >
-            <div class="rating-range-track">
-              <span
-                v-for="star in 5"
-                :key="star"
-                class="rating-range-tick"
-              ></span>
-            </div>
-            <div class="rating-range-active"></div>
             <button
               type="button"
-              class="rating-range-handle rating-range-handle-min"
-              :class="{ dragging: ratingRangeDragState?.handle === 'min' }"
-              aria-label="最低我的评分"
-              :aria-valuenow="userRatingMin"
-              aria-valuemin="1"
-              aria-valuemax="5"
-              @pointerdown.stop="startRatingRangeDrag($event, 'min')"
-              @keydown="handleRatingRangeKeydown('min', $event)"
-            ></button>
-            <button
-              type="button"
-              class="rating-range-handle rating-range-handle-max"
-              :class="{ dragging: ratingRangeDragState?.handle === 'max' }"
-              aria-label="最高我的评分"
-              :aria-valuenow="userRatingMax"
-              aria-valuemin="1"
-              aria-valuemax="5"
-              @pointerdown.stop="startRatingRangeDrag($event, 'max')"
-              @keydown="handleRatingRangeKeydown('max', $event)"
-            ></button>
-          </div>
-          <div class="rating-range-labels">
-            <span
-              v-for="star in 5"
-              :key="star"
-              :class="{ active: star >= userRatingMin && star <= userRatingMax }"
+              class="rating-filter-trigger"
+              :class="{ active: ratingRangePopoverOpen || hasUserRatingRangeFilter }"
+              @click="toggleRatingRangePopover"
             >
-              {{ star }}星
-            </span>
+              <span>我的评分</span>
+              <strong>{{ userRatingRangeLabel }}</strong>
+              <span class="rating-filter-arrow"></span>
+            </button>
+
+            <div
+              v-if="ratingRangePopoverOpen"
+              class="rating-range-popover"
+            >
+              <div class="rating-range-popover-title">我的评分</div>
+              <div class="rating-range-panel">
+                <div
+                  ref="ratingRangeControlRef"
+                  class="rating-range-control"
+                  :style="{
+                    '--range-start': userRatingRangeStart,
+                    '--range-end': userRatingRangeEnd
+                  }"
+                  @pointerdown="startRatingRangeDrag"
+                >
+                  <div class="rating-range-track">
+                    <span
+                      v-for="star in 5"
+                      :key="star"
+                      class="rating-range-tick"
+                    ></span>
+                  </div>
+                  <div class="rating-range-active"></div>
+                  <button
+                    type="button"
+                    class="rating-range-handle rating-range-handle-min"
+                    :class="{ dragging: ratingRangeDragState?.handle === 'min' }"
+                    aria-label="最低我的评分"
+                    :aria-valuenow="userRatingMin"
+                    aria-valuemin="1"
+                    aria-valuemax="5"
+                    @pointerdown.stop="startRatingRangeDrag($event, 'min')"
+                    @keydown="handleRatingRangeKeydown('min', $event)"
+                  ></button>
+                  <button
+                    type="button"
+                    class="rating-range-handle rating-range-handle-max"
+                    :class="{ dragging: ratingRangeDragState?.handle === 'max' }"
+                    aria-label="最高我的评分"
+                    :aria-valuenow="userRatingMax"
+                    aria-valuemin="1"
+                    aria-valuemax="5"
+                    @pointerdown.stop="startRatingRangeDrag($event, 'max')"
+                    @keydown="handleRatingRangeKeydown('max', $event)"
+                  ></button>
+                </div>
+                <div class="rating-range-labels">
+                  <span
+                    v-for="star in 5"
+                    :key="star"
+                    :class="{ active: star >= userRatingMin && star <= userRatingMax }"
+                  >
+                    {{ star }}星
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -980,13 +1015,82 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.rating-filter-row {
-  margin-top: 6px;
+.rating-filter-inline {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.rating-filter-trigger {
+  height: 28px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 10px;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rating-filter-trigger:hover,
+.rating-filter-trigger.active {
+  border-color: #b7d5ff;
+  background: #eef5ff;
+  color: #1677ff;
+}
+
+.rating-filter-trigger strong {
+  color: inherit;
+  font-weight: 700;
+}
+
+.rating-filter-arrow {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.rating-range-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: 330px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 14px 18px 13px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.rating-range-popover::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 22px;
+  width: 12px;
+  height: 12px;
+  border-left: 1px solid #e5e7eb;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  transform: rotate(45deg);
+}
+
+.rating-range-popover-title {
+  margin-bottom: 8px;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .rating-range-panel {
   display: grid;
-  grid-template-columns: 420px;
+  grid-template-columns: 260px;
   align-items: start;
   row-gap: 8px;
   min-width: 0;
@@ -994,7 +1098,7 @@ onBeforeUnmount(() => {
 
 .rating-range-control {
   position: relative;
-  width: 420px;
+  width: 260px;
   height: 30px;
   cursor: pointer;
   --range-start: 0%;
@@ -1087,7 +1191,7 @@ onBeforeUnmount(() => {
 .rating-range-labels {
   grid-column: 1;
   position: relative;
-  width: 420px;
+  width: 260px;
   height: 20px;
   margin-top: -1px;
   color: #6b7280;
@@ -1690,6 +1794,17 @@ onBeforeUnmount(() => {
 
   .option {
     background: #f3f4f6;
+  }
+
+  .filter-row:has(.rating-filter-inline) .options {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .rating-range-popover {
+    left: auto;
+    right: 0;
+    width: min(330px, calc(100vw - 48px));
   }
 
   .rating-range-panel {
