@@ -1,6 +1,6 @@
 package com.example.movie.dto;
 
-import jakarta.persistence.Column;
+import com.example.movie.enums.UserMovieStatus;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -21,6 +21,8 @@ public class MovieResponse {
     private Integer voteCount;
     private String posterPath;
     private LocalDateTime createdAt;
+    private UserMovieStatus userMovieStatus;
     private Byte userRating;
     private LocalDate userWatchedDate;
+    private LocalDateTime userMovieUpdatedAt;
 }

@@ -249,7 +249,7 @@ public class MovieService {
 //        }
 
         List<Movie> movies = moviePage.getContent();
-        Map<Long, UserMovie> userMoviesByMovieId = getUserMoviesByMovieId(movies, currentUserId, movieQuery);
+        Map<Long, UserMovie> userMoviesByMovieId = getUserMoviesByMovieId(movies, currentUserId);
 
         List<MovieResponse> content = movies
                 .stream()
@@ -290,11 +290,8 @@ public class MovieService {
 
     private Map<Long, UserMovie> getUserMoviesByMovieId(
             List<Movie> movies,
-            Long currentUserId,
-            MovieQuery movieQuery) {
-        if (currentUserId == null
-                || movieQuery.getUserMovieStatus() != UserMovieStatusFilter.WATCHED
-                || movies.isEmpty()) {
+            Long currentUserId) {
+        if (currentUserId == null || movies.isEmpty()) {
             return Map.of();
         }
 
@@ -341,8 +338,10 @@ public class MovieService {
         response.setPosterPath(movie.getPosterPath());
         response.setCreatedAt(movie.getCreatedAt());
         if (userMovie != null) {
+            response.setUserMovieStatus(userMovie.getStatus());
             response.setUserRating(userMovie.getRating());
             response.setUserWatchedDate(userMovie.getWatchedDate());
+            response.setUserMovieUpdatedAt(userMovie.getUpdatedAt());
         }
         return response;
     }

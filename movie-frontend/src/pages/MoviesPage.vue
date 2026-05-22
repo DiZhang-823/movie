@@ -6,6 +6,7 @@ import { saveUserMovie, type UserMovieRequest, type UserMovieStatus } from '../a
 import { getToken, isLoggedIn } from '../utils/auth'
 
 type UserMovieStatusFilter = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
+type MarkedUserMovieStatus = Exclude<UserMovieStatusFilter, 'UNMARKED'>
 
 const categories = ref<{ id: number | null; name: string }[]>([
   { id: null, name: '全部' }
@@ -247,11 +248,42 @@ function getPosterUrl(path: string | null) {
   return `https://image.tmdb.org/t/p/w500${path}`
 }
 
-function formatWatchedDate(dateStr: string | null) {
+function formatStatusDate(dateStr: string | null) {
   if (!dateStr) {
     return ''
   }
-  return dateStr.slice(0, 10)
+  return dateStr.slice(0, 10).replaceAll('-', '/')
+}
+
+function getStatusLabel(status: MarkedUserMovieStatus | null) {
+  if (status === 'WANT_TO_WATCH') {
+    return '想看'
+  }
+  if (status === 'WATCHED') {
+    return '看过'
+  }
+  if (status === 'NOT_INTERESTED') {
+    return '不想看'
+  }
+  return ''
+}
+
+function getStatusClass(status: MarkedUserMovieStatus | null) {
+  return status ? `status-${status.toLowerCase().replaceAll('_', '-')}` : ''
+}
+
+function getStatusDate(movie: MovieItem) {
+  if (movie.userMovieStatus === 'WATCHED') {
+    return movie.userWatchedDate ?? movie.userMovieUpdatedAt
+  }
+  return movie.userMovieUpdatedAt
+}
+
+function getRatingValue(rating: number | null) {
+  if (rating === null) {
+    return 0
+  }
+  return Math.max(0, Math.min(5, Math.round(rating)))
 }
 
 function getTodayString() {
@@ -526,6 +558,30 @@ onBeforeUnmount(() => {
                   class="poster"
               />
               <div v-else class="poster placeholder">No Image</div>
+
+              <div
+                v-if="movie.userMovieStatus"
+                class="poster-status-overlay"
+                :class="getStatusClass(movie.userMovieStatus)"
+              >
+                <div class="poster-status-line">
+                  <span class="poster-status-pill">
+                    {{ getStatusLabel(movie.userMovieStatus) }}
+                  </span>
+                  <span v-if="getStatusDate(movie)" class="poster-status-date">
+                    {{ formatStatusDate(getStatusDate(movie)) }}
+                  </span>
+                </div>
+                <div v-if="movie.userMovieStatus === 'WATCHED'" class="poster-status-stars">
+                  <span
+                    v-for="star in 5"
+                    :key="star"
+                    :class="{ filled: star <= getRatingValue(movie.userRating) }"
+                  >
+                    ★
+                  </span>
+                </div>
+              </div>
             </div>
           </a>
 
@@ -630,22 +686,6 @@ onBeforeUnmount(() => {
             <div class="rating">
               {{ Number(movie.voteAverage ?? 0).toFixed(2) }}
             </div>
-          </div>
-          <div
-            v-if="selectedUserMovieStatus.value === 'WATCHED' && (movie.userRating != null || movie.userWatchedDate)"
-            class="watched-meta"
-          >
-            <span v-if="movie.userRating != null" class="watched-rating">
-              <span class="watched-star">★</span>
-              我的评分 {{ movie.userRating }}/5
-            </span>
-            <span
-              v-if="movie.userRating != null && movie.userWatchedDate"
-              class="watched-dot"
-            ></span>
-            <span v-if="movie.userWatchedDate" class="watched-date">
-              {{ formatWatchedDate(movie.userWatchedDate) }} 看过
-            </span>
           </div>
         </a>
       </div>
@@ -824,12 +864,88 @@ onBeforeUnmount(() => {
 }
 
 .poster-wrapper {
+  position: relative;
   width: 100%;
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border-radius: 10px;
   background: #eaeaea;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.poster-status-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 36px 10px 10px;
+  background: linear-gradient(
+    to top,
+    rgba(17, 24, 39, 0.96),
+    rgba(17, 24, 39, 0.74) 56%,
+    rgba(17, 24, 39, 0)
+  );
+  color: #fff;
+  pointer-events: none;
+}
+
+.poster-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.poster-status-pill {
+  flex-shrink: 0;
+  min-width: 44px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.status-want-to-watch .poster-status-pill {
+  background: #1677ff;
+}
+
+.status-watched .poster-status-pill {
+  background: #22c55e;
+}
+
+.status-not-interested .poster-status-pill {
+  min-width: 58px;
+  background: #6b7280;
+}
+
+.poster-status-date {
+  min-width: 0;
+  color: #f9fafb;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.poster-status-stars {
+  display: flex;
+  gap: 1px;
+  margin-top: 5px;
+  color: #9ca3af;
+  font-size: 16px;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.poster-status-stars .filled {
+  color: #fbbf24;
 }
 
 .poster-action-button {
@@ -1112,38 +1228,6 @@ onBeforeUnmount(() => {
   color: #f5a623;
 }
 
-.watched-meta {
-  margin-top: 5px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-height: 20px;
-  color: #6b7280;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.watched-rating {
-  color: #4b5563;
-  font-weight: 600;
-}
-
-.watched-star {
-  color: #f5a623;
-}
-
-.watched-dot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: #d1d5db;
-}
-
-.watched-date {
-  color: #6b7280;
-}
-
 /* ===== 分页 ===== */
 .pagination {
   display: flex;
@@ -1275,6 +1359,34 @@ onBeforeUnmount(() => {
     transform: translateY(0);
   }
 
+  .poster-status-overlay {
+    padding: 30px 8px 8px;
+  }
+
+  .poster-status-line {
+    gap: 6px;
+  }
+
+  .poster-status-pill {
+    min-width: 40px;
+    height: 22px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .status-not-interested .poster-status-pill {
+    min-width: 54px;
+  }
+
+  .poster-status-date {
+    font-size: 12px;
+  }
+
+  .poster-status-stars {
+    margin-top: 4px;
+    font-size: 14px;
+  }
+
   .movie-action-menu {
     width: 120px;
   }
@@ -1297,12 +1409,6 @@ onBeforeUnmount(() => {
   .rating {
     display: inline-flex;
     margin-top: 2px;
-  }
-
-  .watched-meta {
-    margin-top: 4px;
-    font-size: 12px;
-    gap: 5px;
   }
 
   .pagination {

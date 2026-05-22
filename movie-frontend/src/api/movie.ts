@@ -11,8 +11,10 @@ export interface MovieItem {
     voteCount: number | null
     posterPath: string | null
     createdAt: string
+    userMovieStatus: 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | null
     userRating: number | null
     userWatchedDate: string | null
+    userMovieUpdatedAt: string | null
 }
 
 export interface MoviePageResponse {
