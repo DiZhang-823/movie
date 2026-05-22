@@ -92,6 +92,7 @@ const totalElements = ref(0)
 const activeActionMovieId = ref<number | null>(null)
 const watchedEditorMovieId = ref<number | null>(null)
 const watchedRating = ref<number | null>(null)
+const hoveredWatchedRating = ref<number | null>(null)
 const watchedYear = ref(new Date().getFullYear())
 const watchedMonth = ref(new Date().getMonth() + 1)
 const watchedDay = ref(new Date().getDate())
@@ -520,6 +521,7 @@ function handleNativeDateChange(event: Event) {
 function closeActionPanels() {
   activeActionMovieId.value = null
   watchedEditorMovieId.value = null
+  hoveredWatchedRating.value = null
   ratingRangePopoverOpen.value = false
 }
 
@@ -532,6 +534,7 @@ function openWatchedEditor(movie: MovieItem) {
   activeActionMovieId.value = null
   watchedEditorMovieId.value = movie.id
   watchedRating.value = movie.userRating ?? null
+  hoveredWatchedRating.value = null
   setWatchedDateParts(movie.userWatchedDate)
 }
 
@@ -883,12 +886,13 @@ onBeforeUnmount(() => {
             <div class="watched-editor-title">标记看过</div>
             <div class="watched-editor-field">
               <span>我的评分</span>
-              <div class="watched-rating-picker">
+              <div class="watched-rating-picker" @mouseleave="hoveredWatchedRating = null">
                 <button
                   v-for="star in 5"
                   :key="star"
                   type="button"
-                  :class="{ selected: watchedRating !== null && star <= watchedRating }"
+                  :class="{ selected: star <= (hoveredWatchedRating ?? watchedRating ?? 0) }"
+                  @mouseenter="hoveredWatchedRating = star"
                   @click="watchedRating = star"
                 >
                   ★
@@ -1542,7 +1546,6 @@ onBeforeUnmount(() => {
   padding: 0;
 }
 
-.watched-rating-picker button:hover,
 .watched-rating-picker button.selected {
   color: #f5a623;
 }
