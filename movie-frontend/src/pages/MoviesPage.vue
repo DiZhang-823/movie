@@ -7,6 +7,13 @@ import { getToken, isLoggedIn } from '../utils/auth'
 
 type UserMovieStatusFilter = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
 type MarkedUserMovieStatus = Exclude<UserMovieStatusFilter, 'UNMARKED'>
+type RatingRangeHandle = 'min' | 'max'
+type RatingRangeDragState = {
+  handle: RatingRangeHandle | null
+  startX: number
+  startMin: number
+  startMax: number
+}
 
 const categories = ref<{ id: number | null; name: string }[]>([
   { id: null, name: '全部' }
@@ -69,6 +76,8 @@ const selectedUserMovieStatus = ref<{ value: UserMovieStatusFilter | null; name:
 const userRatingMin = ref(1)
 const userRatingMax = ref(5)
 const isUserLoggedIn = ref(isLoggedIn())
+const ratingRangeControlRef = ref<HTMLElement | null>(null)
+const ratingRangeDragState = ref<RatingRangeDragState | null>(null)
 
 const movies = ref<MovieItem[]>([])
 const loading = ref(false)
@@ -212,18 +221,124 @@ function resetUserRatingRange(shouldLoad = true) {
   }
 }
 
-function handleUserRatingMinInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
-  userRatingMin.value = Math.min(value, userRatingMax.value)
+function clampRating(value: number) {
+  return Math.min(5, Math.max(1, value))
 }
 
-function handleUserRatingMaxInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value)
-  userRatingMax.value = Math.max(value, userRatingMin.value)
+function getRatingFromPointer(event: PointerEvent) {
+  if (!ratingRangeControlRef.value) {
+    return userRatingMin.value
+  }
+
+  const rect = ratingRangeControlRef.value.getBoundingClientRect()
+  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+  return clampRating(Math.round(ratio * 4) + 1)
 }
 
-function handleUserRatingRangeChange() {
-  if (showUserRatingRange.value) {
+function chooseRatingRangeHandle(value: number): RatingRangeHandle | null {
+  if (userRatingMin.value === userRatingMax.value) {
+    if (value < userRatingMin.value) {
+      return 'min'
+    }
+    if (value > userRatingMax.value) {
+      return 'max'
+    }
+    return null
+  }
+
+  const minDistance = Math.abs(value - userRatingMin.value)
+  const maxDistance = Math.abs(value - userRatingMax.value)
+  if (minDistance < maxDistance) {
+    return 'min'
+  }
+  if (maxDistance < minDistance) {
+    return 'max'
+  }
+  return value < userRatingMin.value ? 'min' : 'max'
+}
+
+function updateRatingRangeHandle(handle: RatingRangeHandle, value: number) {
+  const rating = clampRating(value)
+  if (handle === 'min') {
+    userRatingMin.value = Math.min(rating, userRatingMax.value)
+  } else {
+    userRatingMax.value = Math.max(rating, userRatingMin.value)
+  }
+}
+
+function startRatingRangeDrag(event: PointerEvent, requestedHandle?: RatingRangeHandle) {
+  event.preventDefault()
+
+  const pointedRating = getRatingFromPointer(event)
+  const handlesOverlap = userRatingMin.value === userRatingMax.value
+  const handle = requestedHandle && !handlesOverlap
+    ? requestedHandle
+    : chooseRatingRangeHandle(pointedRating)
+
+  ratingRangeDragState.value = {
+    handle,
+    startX: event.clientX,
+    startMin: userRatingMin.value,
+    startMax: userRatingMax.value
+  }
+
+  if (handle) {
+    updateRatingRangeHandle(handle, pointedRating)
+  }
+
+  window.addEventListener('pointermove', handleRatingRangePointerMove)
+  window.addEventListener('pointerup', finishRatingRangeDrag)
+}
+
+function handleRatingRangePointerMove(event: PointerEvent) {
+  const dragState = ratingRangeDragState.value
+  if (!dragState) {
+    return
+  }
+
+  let handle = dragState.handle
+  if (!handle) {
+    const movement = event.clientX - dragState.startX
+    if (Math.abs(movement) < 2) {
+      return
+    }
+    handle = movement < 0 ? 'min' : 'max'
+    dragState.handle = handle
+  }
+
+  updateRatingRangeHandle(handle, getRatingFromPointer(event))
+}
+
+function finishRatingRangeDrag() {
+  const dragState = ratingRangeDragState.value
+  ratingRangeDragState.value = null
+  window.removeEventListener('pointermove', handleRatingRangePointerMove)
+  window.removeEventListener('pointerup', finishRatingRangeDrag)
+
+  if (
+    dragState &&
+    showUserRatingRange.value &&
+    (dragState.startMin !== userRatingMin.value || dragState.startMax !== userRatingMax.value)
+  ) {
+    resetPageAndLoadMovies()
+  }
+}
+
+function handleRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEvent) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowDown' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp') {
+    return
+  }
+
+  event.preventDefault()
+  const delta = event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 1
+  const nextValue = handle === 'min'
+    ? userRatingMin.value + delta
+    : userRatingMax.value + delta
+  const previousMin = userRatingMin.value
+  const previousMax = userRatingMax.value
+
+  updateRatingRangeHandle(handle, nextValue)
+  if (previousMin !== userRatingMin.value || previousMax !== userRatingMax.value) {
     resetPageAndLoadMovies()
   }
 }
@@ -481,6 +596,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', closeActionPanels)
+  window.removeEventListener('pointermove', handleRatingRangePointerMove)
+  window.removeEventListener('pointerup', finishRatingRangeDrag)
 })
 </script>
 
@@ -551,11 +668,13 @@ onBeforeUnmount(() => {
         <span class="label">我的评分：</span>
         <div class="rating-range-panel">
           <div
+            ref="ratingRangeControlRef"
             class="rating-range-control"
             :style="{
               '--range-start': userRatingRangeStart,
               '--range-end': userRatingRangeEnd
             }"
+            @pointerdown="startRatingRangeDrag"
           >
             <div class="rating-range-track">
               <span
@@ -565,28 +684,28 @@ onBeforeUnmount(() => {
               ></span>
             </div>
             <div class="rating-range-active"></div>
-            <input
-              class="rating-range-input rating-range-min"
-              type="range"
-              min="1"
-              max="5"
-              step="1"
-              :value="userRatingMin"
+            <button
+              type="button"
+              class="rating-range-handle rating-range-handle-min"
+              :class="{ dragging: ratingRangeDragState?.handle === 'min' }"
               aria-label="最低我的评分"
-              @input="handleUserRatingMinInput"
-              @change="handleUserRatingRangeChange"
-            />
-            <input
-              class="rating-range-input rating-range-max"
-              type="range"
-              min="1"
-              max="5"
-              step="1"
-              :value="userRatingMax"
+              :aria-valuenow="userRatingMin"
+              aria-valuemin="1"
+              aria-valuemax="5"
+              @pointerdown.stop="startRatingRangeDrag($event, 'min')"
+              @keydown="handleRatingRangeKeydown('min', $event)"
+            ></button>
+            <button
+              type="button"
+              class="rating-range-handle rating-range-handle-max"
+              :class="{ dragging: ratingRangeDragState?.handle === 'max' }"
               aria-label="最高我的评分"
-              @input="handleUserRatingMaxInput"
-              @change="handleUserRatingRangeChange"
-            />
+              :aria-valuenow="userRatingMax"
+              aria-valuemin="1"
+              aria-valuemax="5"
+              @pointerdown.stop="startRatingRangeDrag($event, 'max')"
+              @keydown="handleRatingRangeKeydown('max', $event)"
+            ></button>
           </div>
           <div class="rating-range-labels">
             <span
@@ -877,6 +996,7 @@ onBeforeUnmount(() => {
   position: relative;
   width: 420px;
   height: 30px;
+  cursor: pointer;
   --range-start: 0%;
   --range-end: 0%;
 }
@@ -931,53 +1051,37 @@ onBeforeUnmount(() => {
   left: 100%;
 }
 
-.rating-range-input {
+.rating-range-handle {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 30px;
-  margin: 0;
-  appearance: none;
-  background: transparent;
-  pointer-events: none;
-}
-
-.rating-range-input::-webkit-slider-runnable-track {
-  height: 30px;
-  background: transparent;
-}
-
-.rating-range-input::-webkit-slider-thumb {
+  top: 15px;
+  z-index: 3;
   width: 26px;
   height: 26px;
-  margin-top: 2px;
   border: 3px solid #1677ff;
   border-radius: 50%;
-  appearance: none;
   background: #fff;
   box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
   cursor: grab;
-  pointer-events: auto;
+  transform: translate(-50%, -50%);
+  touch-action: none;
 }
 
-.rating-range-input:active::-webkit-slider-thumb {
+.rating-range-handle:active,
+.rating-range-handle.dragging {
   cursor: grabbing;
 }
 
-.rating-range-input::-moz-range-track {
-  height: 30px;
-  background: transparent;
+.rating-range-handle:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
 }
 
-.rating-range-input::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border: 3px solid #1677ff;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
-  cursor: grab;
-  pointer-events: auto;
+.rating-range-handle-min {
+  left: var(--range-start);
+}
+
+.rating-range-handle-max {
+  left: calc(100% - var(--range-end));
 }
 
 .rating-range-labels {
