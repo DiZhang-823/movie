@@ -56,11 +56,15 @@ public class MovieController {
 
     ) {
         Long currentUserId = null;
-        if (userMovieStatus != null) {
-            if (authentication == null || "anonymousUser".equals(authentication.getName())) {
-                return ResponseEntity.status(401).build();
-            }
+        boolean authenticated = authentication != null
+                && authentication.isAuthenticated()
+                && !"anonymousUser".equals(authentication.getName());
 
+        if (userMovieStatus != null && !authenticated) {
+            return ResponseEntity.status(401).build();
+        }
+
+        if (authenticated) {
             User user = userRepository.findByUsername(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("User not found"));
             currentUserId = user.getId();
