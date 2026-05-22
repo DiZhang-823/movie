@@ -548,7 +548,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="showUserRatingRange" class="filter-row rating-filter-row">
-        <span class="label">个人评分：</span>
+        <span class="label">我的评分：</span>
         <div class="rating-range-panel">
           <div
             class="rating-range-control"
@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
               max="5"
               step="1"
               :value="userRatingMin"
-              aria-label="最低个人评分"
+              aria-label="最低我的评分"
               @input="handleUserRatingMinInput"
               @change="handleUserRatingRangeChange"
             />
@@ -583,7 +583,7 @@ onBeforeUnmount(() => {
               max="5"
               step="1"
               :value="userRatingMax"
-              aria-label="最高个人评分"
+              aria-label="最高我的评分"
               @input="handleUserRatingMaxInput"
               @change="handleUserRatingRangeChange"
             />
@@ -597,14 +597,6 @@ onBeforeUnmount(() => {
               {{ star }}星
             </span>
           </div>
-          <button
-            v-if="userRatingMin !== 1 || userRatingMax !== 5"
-            type="button"
-            class="rating-range-reset"
-            @click="resetUserRatingRange()"
-          >
-            重置
-          </button>
         </div>
       </div>
     </div>
@@ -875,9 +867,8 @@ onBeforeUnmount(() => {
 
 .rating-range-panel {
   display: grid;
-  grid-template-columns: 420px auto;
+  grid-template-columns: 420px;
   align-items: start;
-  column-gap: 16px;
   row-gap: 8px;
   min-width: 0;
 }
@@ -991,47 +982,46 @@ onBeforeUnmount(() => {
 
 .rating-range-labels {
   grid-column: 1;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  position: relative;
   width: 420px;
-  margin-top: -3px;
+  height: 20px;
+  margin-top: -1px;
   color: #6b7280;
   font-size: 12px;
 }
 
 .rating-range-labels span {
-  text-align: center;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
-.rating-range-labels span:first-child {
-  text-align: left;
+.rating-range-labels span:nth-child(1) {
+  left: 0;
+  transform: translateX(0);
 }
 
-.rating-range-labels span:last-child {
-  text-align: right;
+.rating-range-labels span:nth-child(2) {
+  left: 25%;
+}
+
+.rating-range-labels span:nth-child(3) {
+  left: 50%;
+}
+
+.rating-range-labels span:nth-child(4) {
+  left: 75%;
+}
+
+.rating-range-labels span:nth-child(5) {
+  left: 100%;
+  transform: translateX(-100%);
 }
 
 .rating-range-labels .active {
   color: #111827;
   font-weight: 700;
-}
-
-.rating-range-reset {
-  grid-column: 2;
-  grid-row: 1;
-  height: 30px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 0 14px;
-  background: #f9fafb;
-  color: #4b5563;
-  cursor: pointer;
-}
-
-.rating-range-reset:hover {
-  color: #1677ff;
-  border-color: #b7d5ff;
-  background: #f3f8ff;
 }
 
 .toolbar {
@@ -1599,9 +1589,8 @@ onBeforeUnmount(() => {
   }
 
   .rating-range-panel {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     width: 100%;
-    column-gap: 10px;
   }
 
   .rating-range-control,
