@@ -51,6 +51,8 @@ const releaseYear = computed(() => {
   return movie.value.releaseDate.slice(0, 4)
 })
 
+const releaseDateDisplay = computed(() => formatReleaseDate(movie.value?.releaseDate))
+
 const heroStyle = computed(() => {
   const styles: Record<string, string> = {}
 
@@ -127,6 +129,19 @@ function formatDate(value: string | null | undefined) {
   }
 
   return `${year}/${month}/${day}`
+}
+
+function formatReleaseDate(value: string | null | undefined) {
+  if (!value) {
+    return '未知'
+  }
+
+  const [year, month, day] = value.slice(0, 10).split('-')
+  if (!year || !month || !day) {
+    return value
+  }
+
+  return `${year}-${month}-${day}`
 }
 
 function formatList(list: string[] | null | undefined) {
@@ -422,7 +437,7 @@ onMounted(async () => {
               </div>
               <div class="score-card">
                 <span class="score-label">上映</span>
-                <strong class="release-score">{{ releaseYear }}</strong>
+                <strong class="release-score">{{ releaseDateDisplay }}</strong>
               </div>
               <div class="score-card runtime-score">
                 <span class="score-label">片长</span>
@@ -507,7 +522,7 @@ onMounted(async () => {
               </div>
               <div class="fact-item">
                 <span>上映日期</span>
-                <strong>{{ formatDate(movie.releaseDate) }}</strong>
+                <strong>{{ releaseDateDisplay }}</strong>
               </div>
               <div class="fact-item">
                 <span>票房</span>
@@ -857,6 +872,11 @@ onMounted(async () => {
   font-size: 24px;
   font-weight: 800;
   line-height: 1.1;
+}
+
+.score-card .release-score {
+  font-size: 21px;
+  white-space: nowrap;
 }
 
 .action-panel {
@@ -1582,6 +1602,10 @@ onMounted(async () => {
   .score-card strong {
     margin-top: 6px;
     font-size: 18px;
+  }
+
+  .score-card .release-score {
+    font-size: 15px;
   }
 
   .action-panel {
