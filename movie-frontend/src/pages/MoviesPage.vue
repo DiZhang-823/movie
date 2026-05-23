@@ -1805,9 +1805,17 @@ onBeforeUnmount(() => {
   }
 
   .rating-range-popover {
-    left: auto;
-    right: 0;
-    width: min(330px, calc(100vw - 48px));
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    width: min(340px, calc(100vw - 32px));
+    transform: translate(-50%, -50%);
+    z-index: 80;
+  }
+
+  .rating-range-popover::before {
+    display: none;
   }
 
   .rating-range-panel {
@@ -1839,6 +1847,10 @@ onBeforeUnmount(() => {
   .movie-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px 10px;
+  }
+
+  .movie-card:hover {
+    transform: none;
   }
 
   .poster-wrapper {
@@ -1883,7 +1895,15 @@ onBeforeUnmount(() => {
   }
 
   .watched-editor-popover {
-    width: min(220px, calc(100vw - 32px));
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    width: min(300px, calc(100vw - 32px));
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    transform: translate(-50%, -50%);
+    z-index: 80;
   }
 
   .movie-meta {
