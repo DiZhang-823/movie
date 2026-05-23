@@ -40,11 +40,14 @@ public class MovieService {
             Map.entry("AU", "澳大利亚"),
             Map.entry("BE", "比利时"),
             Map.entry("BR", "巴西"),
+            Map.entry("BU", "缅甸"),
             Map.entry("CA", "加拿大"),
             Map.entry("CH", "瑞士"),
             Map.entry("CN", "中国大陆"),
+            Map.entry("CS", "捷克斯洛伐克"),
             Map.entry("CZ", "捷克"),
             Map.entry("DE", "德国"),
+            Map.entry("DD", "东德"),
             Map.entry("DK", "丹麦"),
             Map.entry("ES", "西班牙"),
             Map.entry("FI", "芬兰"),
@@ -60,6 +63,7 @@ public class MovieService {
             Map.entry("IT", "意大利"),
             Map.entry("JP", "日本"),
             Map.entry("KR", "韩国"),
+            Map.entry("MO", "澳门"),
             Map.entry("MX", "墨西哥"),
             Map.entry("MY", "马来西亚"),
             Map.entry("NL", "荷兰"),
@@ -67,15 +71,23 @@ public class MovieService {
             Map.entry("NZ", "新西兰"),
             Map.entry("PH", "菲律宾"),
             Map.entry("PL", "波兰"),
+            Map.entry("PS", "巴勒斯坦"),
             Map.entry("PT", "葡萄牙"),
             Map.entry("RU", "俄罗斯"),
             Map.entry("SE", "瑞典"),
             Map.entry("SG", "新加坡"),
+            Map.entry("SU", "苏联"),
             Map.entry("TH", "泰国"),
+            Map.entry("TP", "东帝汶"),
             Map.entry("TR", "土耳其"),
             Map.entry("TW", "台湾"),
             Map.entry("US", "美国"),
             Map.entry("VN", "越南"),
+            Map.entry("XC", "捷克斯洛伐克"),
+            Map.entry("XG", "东德"),
+            Map.entry("XK", "科索沃"),
+            Map.entry("YU", "南斯拉夫"),
+            Map.entry("ZR", "扎伊尔"),
             Map.entry("ZA", "南非")
     );
 
@@ -476,6 +488,11 @@ public class MovieService {
     private String getCountryDisplayName(Country country) {
         if (hasText(country.getChineseName())) {
             return country.getChineseName();
+        }
+
+        String resolvedChineseName = resolveChineseCountryName(country.getCode());
+        if (hasText(resolvedChineseName)) {
+            return resolvedChineseName;
         }
 
         return country.getName();
