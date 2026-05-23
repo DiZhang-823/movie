@@ -22,7 +22,9 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.HashSet;
+import java.util.IllformedLocaleException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -30,6 +32,52 @@ import java.util.stream.Collectors;
 
 @Service
 public class MovieService {
+
+    private static final Map<String, String> COUNTRY_NAME_ZH_OVERRIDES = Map.ofEntries(
+            Map.entry("AE", "阿联酋"),
+            Map.entry("AR", "阿根廷"),
+            Map.entry("AT", "奥地利"),
+            Map.entry("AU", "澳大利亚"),
+            Map.entry("BE", "比利时"),
+            Map.entry("BR", "巴西"),
+            Map.entry("CA", "加拿大"),
+            Map.entry("CH", "瑞士"),
+            Map.entry("CN", "中国大陆"),
+            Map.entry("CZ", "捷克"),
+            Map.entry("DE", "德国"),
+            Map.entry("DK", "丹麦"),
+            Map.entry("ES", "西班牙"),
+            Map.entry("FI", "芬兰"),
+            Map.entry("FR", "法国"),
+            Map.entry("GB", "英国"),
+            Map.entry("GR", "希腊"),
+            Map.entry("HK", "香港"),
+            Map.entry("ID", "印度尼西亚"),
+            Map.entry("IE", "爱尔兰"),
+            Map.entry("IL", "以色列"),
+            Map.entry("IN", "印度"),
+            Map.entry("IR", "伊朗"),
+            Map.entry("IT", "意大利"),
+            Map.entry("JP", "日本"),
+            Map.entry("KR", "韩国"),
+            Map.entry("MX", "墨西哥"),
+            Map.entry("MY", "马来西亚"),
+            Map.entry("NL", "荷兰"),
+            Map.entry("NO", "挪威"),
+            Map.entry("NZ", "新西兰"),
+            Map.entry("PH", "菲律宾"),
+            Map.entry("PL", "波兰"),
+            Map.entry("PT", "葡萄牙"),
+            Map.entry("RU", "俄罗斯"),
+            Map.entry("SE", "瑞典"),
+            Map.entry("SG", "新加坡"),
+            Map.entry("TH", "泰国"),
+            Map.entry("TR", "土耳其"),
+            Map.entry("TW", "台湾"),
+            Map.entry("US", "美国"),
+            Map.entry("VN", "越南"),
+            Map.entry("ZA", "南非")
+    );
 
     private final TmdbClient tmdbClient;
     private final MovieRepository movieRepository;
@@ -158,8 +206,12 @@ public class MovieService {
                         Country newCountry = new Country();
                         newCountry.setCode(countryResponse.getIso31661());
                         newCountry.setName(countryResponse.getName());
+                        newCountry.setChineseName(resolveChineseCountryName(countryResponse.getIso31661()));
                         return countryRepository.save(newCountry);
                     });
+            if (!hasText(country.getChineseName())) {
+                country.setChineseName(resolveChineseCountryName(country.getCode()));
+            }
             countries.add(country);
         }
         return countries;
@@ -387,7 +439,7 @@ public class MovieService {
 
         response.setCountries(
                 movie.getCountries().stream()
-                        .map(Country::getName)
+                        .map(this::getCountryDisplayName)
                         .toList()
         );
 
@@ -419,5 +471,40 @@ public class MovieService {
         item.setCharacter(moviePerson.getCharacterName());
         item.setJob(moviePerson.getJob());
         return item;
+    }
+
+    private String getCountryDisplayName(Country country) {
+        if (hasText(country.getChineseName())) {
+            return country.getChineseName();
+        }
+
+        return country.getName();
+    }
+
+    private String resolveChineseCountryName(String countryCode) {
+        if (!hasText(countryCode)) {
+            return null;
+        }
+
+        String normalizedCode = countryCode.trim().toUpperCase(Locale.ROOT);
+        String overriddenName = COUNTRY_NAME_ZH_OVERRIDES.get(normalizedCode);
+        if (overriddenName != null) {
+            return overriddenName;
+        }
+
+        try {
+            Locale countryLocale = new Locale.Builder().setRegion(normalizedCode).build();
+            String displayName = countryLocale.getDisplayCountry(Locale.SIMPLIFIED_CHINESE);
+            if (displayName.equals(normalizedCode)) {
+                return null;
+            }
+            return displayName;
+        } catch (IllformedLocaleException ignored) {
+            return null;
+        }
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

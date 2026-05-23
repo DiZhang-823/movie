@@ -18,4 +18,7 @@ public class Country {
 
     @Column(nullable = false)
     private String name;
+
+    @Column(name = "chinese_name")
+    private String chineseName;
 }
