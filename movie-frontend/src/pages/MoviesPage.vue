@@ -143,6 +143,11 @@ const visiblePages = computed(() => {
   pages.push(0, '...', current - 1, current, current + 1, '...', total - 1)
   return pages
 })
+const recentYears = computed(() => years.value.slice(0, 10))
+const olderYears = computed(() => years.value.slice(10))
+const isOlderYearSelected = computed(() =>
+  selectedYear.value !== null && !recentYears.value.includes(selectedYear.value)
+)
 
 async function loadGenres() {
   const data = await getGenres()
@@ -205,7 +210,18 @@ function handleRegionClick(region: {code: string | null; name: string }) {
   resetPageAndLoadMovies()
 }
 
-function handleYearChange() {
+function handleYearClick(year: number | null) {
+  selectedYear.value = year
+  resetPageAndLoadMovies()
+}
+
+function handleOlderYearChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (!value) {
+    return
+  }
+
+  selectedYear.value = Number(value)
   resetPageAndLoadMovies()
 }
 
@@ -652,21 +668,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="filter-row">
-        <span class="label">排序：</span>
-        <div class="options">
-          <span
-              v-for="item in sortOptions"
-              :key="item.sortBy"
-              class="option"
-              :class="{ active: selectedSort.sortBy === item.sortBy }"
-              @click="handleSortClick(item)"
-          >
-            {{ item.name }}
-          </span>
-        </div>
-      </div>
-
       <div v-if="isUserLoggedIn" class="filter-row">
         <span class="label">状态：</span>
         <div class="options">
@@ -756,24 +757,73 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
-    </div>
 
-    <div class="toolbar">
-      <select v-model="selectedYear" @change="handleYearChange">
-        <option :value="null">全部年份</option>
-        <option v-for="year in years" :key="year" :value="year">
-          {{ year }}
-        </option>
-      </select>
+      <div class="filter-row">
+        <span class="label">年份：</span>
+        <div class="options year-options">
+          <span
+            class="option"
+            :class="{ active: selectedYear === null }"
+            @click="handleYearClick(null)"
+          >
+            全部
+          </span>
+          <span
+            v-for="year in recentYears"
+            :key="year"
+            class="option"
+            :class="{ active: selectedYear === year }"
+            @click="handleYearClick(year)"
+          >
+            {{ year }}
+          </span>
 
-      <input
+          <select
+            class="older-year-select"
+            :class="{ active: isOlderYearSelected }"
+            :value="isOlderYearSelected ? selectedYear : ''"
+            @change="handleOlderYearChange"
+          >
+            <option value="">更早年份</option>
+            <option
+              v-for="year in olderYears"
+              :key="year"
+              :value="year"
+            >
+              {{ year }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <span class="label">排序：</span>
+        <div class="options">
+          <span
+              v-for="item in sortOptions"
+              :key="item.sortBy"
+              class="option"
+              :class="{ active: selectedSort.sortBy === item.sortBy }"
+              @click="handleSortClick(item)"
+          >
+            {{ item.name }}
+          </span>
+        </div>
+      </div>
+
+      <div class="filter-row search-filter-row">
+        <span class="label">搜索：</span>
+        <div class="options search-options">
+          <input
           v-model="keyword"
           type="text"
+          class="title-search-input"
           placeholder="请输入电影标题"
           @input="handleKeywordInput"
           @keyup.enter="handleSearch"
-      />
-<!--      <button @click="handleSearch">搜索</button>-->
+          />
+        </div>
+      </div>
     </div>
 
     <div class="summary">
@@ -1019,6 +1069,50 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
+.older-year-select {
+  height: 28px;
+  padding: 0 28px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #111827;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.older-year-select:hover {
+  color: #1677ff;
+}
+
+.older-year-select.active {
+  border-color: #1677ff;
+  background: #1677ff;
+  color: #fff;
+}
+
+.search-options {
+  flex: 0 1 360px;
+}
+
+.title-search-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  background: #f8fafc;
+  color: #172033;
+  font-size: 13px;
+  outline: none;
+}
+
+.title-search-input:focus {
+  border-color: #9dc8ff;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
 .rating-filter-inline {
   position: relative;
   flex-shrink: 0;
@@ -1236,31 +1330,6 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
-.toolbar {
-  display: flex;
-  gap: 12px;
-  min-width: 0;
-}
-
-.toolbar input {
-  width: 280px;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  outline: none;
-}
-
-.toolbar select {
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid #dcdfe6;
-  border-radius: 6px;
-  outline: none;
-  background: #fff;
-}
-
-.toolbar button,
 .pagination button {
   height: 36px;
   padding: 0 16px;
@@ -1271,7 +1340,6 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
-.toolbar button:disabled,
 .pagination button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -1832,16 +1900,21 @@ onBeforeUnmount(() => {
     font-size: 11px;
   }
 
-  .toolbar {
-    display: grid;
-    grid-template-columns: 120px minmax(0, 1fr);
-    gap: 8px;
+  .year-options {
+    flex-wrap: nowrap;
   }
 
-  .toolbar input,
-  .toolbar select {
+  .older-year-select {
+    flex: 0 0 auto;
+  }
+
+  .search-filter-row .options {
+    overflow: visible;
+  }
+
+  .search-options {
+    flex: 1 1 auto;
     width: 100%;
-    min-width: 0;
   }
 
   .movie-list {
@@ -1958,10 +2031,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 380px) {
-  .toolbar {
-    grid-template-columns: 1fr;
-  }
-
   .title-year,
   .rating {
     font-size: 13px;
