@@ -4,6 +4,13 @@ import { useRoute } from 'vue-router'
 import { getMovieById, type MovieCollectionItem, type MovieDetail, type PersonItem } from '@/api/movie'
 import { getUserMovie, saveUserMovie, type UserMovieResponse } from '@/api/userMovie'
 
+type DisplayRatingSource = {
+  voteAverage?: number | null
+  voteCount?: number | null
+  imdbVoteAverage?: number | null
+  imdbVoteCount?: number | null
+}
+
 const route = useRoute()
 
 const movie = ref<MovieDetail | null>(null)
@@ -128,6 +135,14 @@ function formatVoteCount(value: number | null | undefined) {
   }
 
   return Number(value).toLocaleString('zh-CN')
+}
+
+function getDisplayVoteAverage(item: DisplayRatingSource) {
+  return item.imdbVoteAverage ?? item.voteAverage
+}
+
+function getDisplayVoteCount(item: DisplayRatingSource) {
+  return item.imdbVoteCount ?? item.voteCount
 }
 
 function formatRuntime(value: number | null | undefined) {
@@ -454,12 +469,12 @@ watch(() => route.params.id, () => {
 
           <div class="score-grid">
               <div class="score-card">
-                <span class="score-label">TMDB评分</span>
-                <strong>{{ formatVoteAverage(movie.voteAverage) }}</strong>
+                <span class="score-label">评分</span>
+                <strong>{{ formatVoteAverage(getDisplayVoteAverage(movie)) }}</strong>
               </div>
               <div class="score-card">
                 <span class="score-label">评分人数</span>
-                <strong>{{ formatVoteCount(movie.voteCount) }}</strong>
+                <strong>{{ formatVoteCount(getDisplayVoteCount(movie)) }}</strong>
               </div>
               <div class="score-card">
                 <span class="score-label">上映</span>
@@ -594,7 +609,7 @@ watch(() => route.params.id, () => {
 
                   <div class="collection-card-side">
                     <div class="collection-card-year">{{ formatYear(item.releaseDate) }}</div>
-                    <div class="collection-card-rating">{{ formatVoteAverage(item.voteAverage) }}</div>
+                    <div class="collection-card-rating">{{ formatVoteAverage(getDisplayVoteAverage(item)) }}</div>
                   </div>
                 </RouterLink>
               </div>

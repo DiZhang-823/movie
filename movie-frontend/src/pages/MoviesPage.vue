@@ -441,6 +441,14 @@ function formatStatusDate(dateStr: string | null) {
   return dateStr.slice(0, 10).replaceAll('-', '/')
 }
 
+function getDisplayVoteAverage(movie: MovieItem) {
+  return movie.imdbVoteAverage ?? movie.voteAverage
+}
+
+function formatDisplayVoteAverage(movie: MovieItem) {
+  return Number(getDisplayVoteAverage(movie) ?? 0).toFixed(2)
+}
+
 function getStatusLabel(status: MarkedUserMovieStatus | null) {
   if (status === 'WANT_TO_WATCH') {
     return '想看'
@@ -985,7 +993,7 @@ onBeforeUnmount(() => {
               {{ movie.title }}<span v-if="movie.releaseDate"> ({{ movie.releaseDate.slice(0, 4) }})</span>
             </div>
             <div class="rating">
-              {{ Number(movie.voteAverage ?? 0).toFixed(2) }}
+              {{ formatDisplayVoteAverage(movie) }}
             </div>
           </div>
         </a>

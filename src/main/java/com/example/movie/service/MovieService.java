@@ -271,8 +271,9 @@ public class MovieService {
                 requestedSortField,
                 requestedDirection
         );
+        boolean useDisplayRatingSort = !useUserMovieDefaultSort && shouldUseDisplayRatingSort(requestedSortField);
 
-        Sort sort = useUserMovieDefaultSort
+        Sort sort = useUserMovieDefaultSort || useDisplayRatingSort
                 ? Sort.unsorted()
                 : Sort.by(requestedDirection, requestedSortField.getField());
 
@@ -315,6 +316,11 @@ public class MovieService {
                                 movieQuery.getUserRatingMax()
                         ));
             }
+        }
+        if (useDisplayRatingSort) {
+            spec = spec.and(requestedSortField == MovieSortField.VOTE_AVERAGE
+                    ? MovieSpecifications.orderByDisplayVoteAverage(requestedDirection)
+                    : MovieSpecifications.orderByDisplayVoteCount(requestedDirection));
         }
 
         Page<Movie> moviePage = movieRepository.findAll(spec, pageable);
@@ -367,6 +373,10 @@ public class MovieService {
 
         return (requestedSortField == MovieSortField.CREATED_AT && requestedDirection == Sort.Direction.DESC)
                 || (requestedSortField == MovieSortField.ID && requestedDirection == Sort.Direction.ASC);
+    }
+
+    private boolean shouldUseDisplayRatingSort(MovieSortField requestedSortField) {
+        return requestedSortField == MovieSortField.VOTE_AVERAGE || requestedSortField == MovieSortField.VOTE_COUNT;
     }
 
     private Map<Long, UserMovie> getUserMoviesByMovieId(
@@ -517,6 +527,10 @@ public class MovieService {
         response.setTitle(movie.getTitle());
         response.setReleaseDate(movie.getReleaseDate());
         response.setVoteAverage(movie.getVoteAverage());
+        response.setVoteCount(movie.getVoteCount());
+        response.setImdbVoteAverage(movie.getImdbVoteAverage());
+        response.setImdbVoteCount(movie.getImdbVoteCount());
+        response.setImdbRatingUpdatedAt(movie.getImdbRatingUpdatedAt());
         response.setPosterPath(movie.getPosterPath());
         response.setSequenceNumber(sequenceNumber);
         return response;

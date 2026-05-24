@@ -162,6 +162,9 @@ public class PersonService {
                 item.setReleaseDate(movie.getReleaseDate());
                 item.setVoteAverage(movie.getVoteAverage());
                 item.setVoteCount(movie.getVoteCount());
+                item.setImdbVoteAverage(movie.getImdbVoteAverage());
+                item.setImdbVoteCount(movie.getImdbVoteCount());
+                item.setImdbRatingUpdatedAt(movie.getImdbRatingUpdatedAt());
                 item.setPosterPath(movie.getPosterPath());
                 item.setJobs(new ArrayList<>());
                 return item;

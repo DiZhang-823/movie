@@ -58,6 +58,10 @@ export type MovieCollectionItem = {
     title: string
     releaseDate: string | null
     voteAverage: number | null
+    voteCount: number | null
+    imdbVoteAverage: number | null
+    imdbVoteCount: number | null
+    imdbRatingUpdatedAt: string | null
     posterPath: string | null
     sequenceNumber: number
 }

@@ -5,14 +5,18 @@ import com.example.movie.entity.Genre;
 import com.example.movie.entity.Movie;
 import com.example.movie.entity.UserMovie;
 import com.example.movie.enums.UserMovieStatus;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 
 import jakarta.persistence.criteria.JoinType;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -85,6 +89,44 @@ public class MovieSpecifications {
                 return cb.conjunction();
             }
             return cb.equal(cb.function("year", Integer.class, root.get("releaseDate")), year);
+        };
+    }
+
+    public static Specification<Movie> orderByDisplayVoteAverage(Sort.Direction direction) {
+        return (root, query, cb) -> {
+            assert query != null;
+
+            if (!isCountQuery(query.getResultType())) {
+                Expression<BigDecimal> displayVoteAverage = cb.coalesce(
+                        root.get("imdbVoteAverage"),
+                        root.get("voteAverage")
+                );
+                query.orderBy(
+                        toOrder(cb, displayVoteAverage, direction),
+                        toOrder(cb, root.get("id"), direction)
+                );
+            }
+
+            return cb.conjunction();
+        };
+    }
+
+    public static Specification<Movie> orderByDisplayVoteCount(Sort.Direction direction) {
+        return (root, query, cb) -> {
+            assert query != null;
+
+            if (!isCountQuery(query.getResultType())) {
+                Expression<Integer> displayVoteCount = cb.coalesce(
+                        root.get("imdbVoteCount"),
+                        root.get("voteCount")
+                );
+                query.orderBy(
+                        toOrder(cb, displayVoteCount, direction),
+                        toOrder(cb, root.get("id"), direction)
+                );
+            }
+
+            return cb.conjunction();
         };
     }
 
@@ -188,5 +230,16 @@ public class MovieSpecifications {
         if (maxRating != null) {
             predicates.add(cb.lessThanOrEqualTo(userMovieRoot.get("rating").as(Integer.class), maxRating));
         }
+    }
+
+    private static boolean isCountQuery(Class<?> resultType) {
+        return Long.class.equals(resultType) || long.class.equals(resultType);
+    }
+
+    private static Order toOrder(
+            jakarta.persistence.criteria.CriteriaBuilder cb,
+            Expression<?> expression,
+            Sort.Direction direction) {
+        return direction == Sort.Direction.ASC ? cb.asc(expression) : cb.desc(expression);
     }
 }

@@ -94,8 +94,8 @@ const topRatedCredits = computed(() => {
   }
 
   return [...person.value.credits]
-    .filter((credit) => credit.voteAverage !== null && credit.voteAverage !== undefined)
-    .sort((a, b) => Number(b.voteAverage) - Number(a.voteAverage))
+    .filter((credit) => getDisplayVoteAverage(credit) !== null && getDisplayVoteAverage(credit) !== undefined)
+    .sort((a, b) => Number(getDisplayVoteAverage(b)) - Number(getDisplayVoteAverage(a)))
     .slice(0, 5)
 })
 
@@ -205,6 +205,10 @@ function formatVoteAverage(value: number | null | undefined) {
   }
 
   return Number(value).toFixed(2)
+}
+
+function getDisplayVoteAverage(credit: PersonMovieCredit) {
+  return credit.imdbVoteAverage ?? credit.voteAverage
 }
 
 function formatPopularity(value: number | null | undefined) {
@@ -422,7 +426,7 @@ onBeforeUnmount(() => {
                 <div class="work-title">{{ credit.title }}</div>
                 <div class="work-meta">
                   <span>{{ formatYear(credit.releaseDate) }}</span>
-                  <strong>{{ formatVoteAverage(credit.voteAverage) }}</strong>
+                  <strong>{{ formatVoteAverage(getDisplayVoteAverage(credit)) }}</strong>
                 </div>
               </RouterLink>
             </div>
@@ -445,7 +449,7 @@ onBeforeUnmount(() => {
                   <strong>{{ credit.title }}</strong>
                   <em>{{ getCreditRole(credit) }}</em>
                 </span>
-                <span class="top-score">{{ formatVoteAverage(credit.voteAverage) }}</span>
+                <span class="top-score">{{ formatVoteAverage(getDisplayVoteAverage(credit)) }}</span>
               </RouterLink>
             </div>
           </section>

@@ -8,6 +8,9 @@ export type PersonMovieCredit = {
     releaseDate: string | null
     voteAverage: number | null
     voteCount: number | null
+    imdbVoteAverage: number | null
+    imdbVoteCount: number | null
+    imdbRatingUpdatedAt: string | null
     posterPath: string | null
     jobs: string[]
     character: string | null
