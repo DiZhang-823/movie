@@ -1071,6 +1071,8 @@ onBeforeUnmount(() => {
 
 .year-number-option {
   width: 52px;
+  min-width: 52px;
+  flex: 0 0 52px;
   height: 28px;
   padding: 0;
   display: inline-flex;
@@ -1915,7 +1917,9 @@ onBeforeUnmount(() => {
   }
 
   .year-number-option {
-    width: 68px;
+    width: 76px;
+    min-width: 76px;
+    flex-basis: 76px;
   }
 
   .older-year-select {
