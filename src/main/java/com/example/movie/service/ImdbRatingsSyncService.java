@@ -18,9 +18,10 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Locale;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 @Service
@@ -32,7 +33,7 @@ public class ImdbRatingsSyncService {
             SET imdb_vote_average = ?,
                 imdb_vote_count = ?,
                 imdb_rating_updated_at = ?
-            WHERE imdb_id = ?
+            WHERE id = ?
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -51,8 +52,8 @@ public class ImdbRatingsSyncService {
     public synchronized ImdbRatingsSyncResponse syncRatings() {
         LocalDateTime startedAt = LocalDateTime.now();
         LocalDateTime ratingUpdatedAt = LocalDateTime.now();
-        Set<String> remainingImdbIds = new HashSet<>(loadMovieImdbIds());
-        int moviesWithImdbId = remainingImdbIds.size();
+        Map<String, List<Long>> movieIdsByImdbId = loadMovieIdsByImdbId();
+        int moviesWithImdbId = movieIdsByImdbId.values().stream().mapToInt(List::size).sum();
         int totalRows = 0;
         int matchedMovies = 0;
         int updatedMovies = 0;
@@ -67,18 +68,24 @@ public class ImdbRatingsSyncService {
             while ((line = reader.readLine()) != null) {
                 totalRows++;
                 String[] columns = line.split("\t");
-                if (columns.length < 3 || !remainingImdbIds.contains(columns[0])) {
+                if (columns.length < 3) {
                     continue;
                 }
 
-                matchedMovies++;
-                remainingImdbIds.remove(columns[0]);
-                batchArgs.add(new Object[] {
-                        new BigDecimal(columns[1]),
-                        Integer.valueOf(columns[2]),
-                        Timestamp.valueOf(ratingUpdatedAt),
-                        columns[0]
-                });
+                List<Long> movieIds = movieIdsByImdbId.remove(normalizeImdbId(columns[0]));
+                if (movieIds == null || movieIds.isEmpty()) {
+                    continue;
+                }
+
+                matchedMovies += movieIds.size();
+                for (Long movieId : movieIds) {
+                    batchArgs.add(new Object[] {
+                            new BigDecimal(columns[1]),
+                            Integer.valueOf(columns[2]),
+                            Timestamp.valueOf(ratingUpdatedAt),
+                            movieId
+                    });
+                }
 
                 if (batchArgs.size() >= BATCH_SIZE) {
                     updatedMovies += flushBatch(batchArgs);
@@ -102,11 +109,21 @@ public class ImdbRatingsSyncService {
         return response;
     }
 
-    private List<String> loadMovieImdbIds() {
-        return jdbcTemplate.queryForList(
-                "SELECT DISTINCT imdb_id FROM movie WHERE imdb_id IS NOT NULL AND imdb_id <> ''",
-                String.class
+    private Map<String, List<Long>> loadMovieIdsByImdbId() {
+        Map<String, List<Long>> movieIdsByImdbId = new HashMap<>();
+
+        jdbcTemplate.query(
+                "SELECT id, imdb_id FROM movie WHERE imdb_id IS NOT NULL AND TRIM(imdb_id) <> ''",
+                resultSet -> {
+                    String imdbId = normalizeImdbId(resultSet.getString("imdb_id"));
+                    if (!imdbId.isBlank()) {
+                        movieIdsByImdbId.computeIfAbsent(imdbId, ignored -> new ArrayList<>())
+                                .add(resultSet.getLong("id"));
+                    }
+                }
         );
+
+        return movieIdsByImdbId;
     }
 
     private InputStream openDatasetStream() throws Exception {
@@ -120,6 +137,10 @@ public class ImdbRatingsSyncService {
             throw new IllegalStateException("IMDb dataset returned HTTP " + response.statusCode());
         }
         return response.body();
+    }
+
+    private String normalizeImdbId(String imdbId) {
+        return imdbId == null ? "" : imdbId.trim().toLowerCase(Locale.ROOT);
     }
 
     private int flushBatch(List<Object[]> batchArgs) {
