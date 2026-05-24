@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getPersonById, type PersonDetail, type PersonMovieCredit } from '@/api/person'
 
@@ -9,6 +9,10 @@ const person = ref<PersonDetail | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const selectedRole = ref('ALL')
+const biographyRef = ref<HTMLElement | null>(null)
+const isBiographyExpanded = ref(false)
+const canToggleBiography = ref(false)
+let biographyResizeTimer: ReturnType<typeof setTimeout> | undefined
 
 const roleOptions = [
   { key: 'ALL', label: '全部' },
@@ -99,6 +103,8 @@ async function loadPersonDetail() {
   loading.value = true
   errorMessage.value = ''
   selectedRole.value = 'ALL'
+  isBiographyExpanded.value = false
+  canToggleBiography.value = false
 
   try {
     const id = Number(route.params.id)
@@ -114,6 +120,54 @@ async function loadPersonDetail() {
   } finally {
     loading.value = false
   }
+
+  if (person.value && !errorMessage.value) {
+    await updateBiographyToggle()
+  }
+}
+
+async function updateBiographyToggle() {
+  await nextTick()
+
+  const biographyElement = biographyRef.value
+  if (!biographyElement || !person.value?.biography) {
+    canToggleBiography.value = false
+    return
+  }
+
+  const isMobile = window.matchMedia('(max-width: 760px)').matches
+  if (!isMobile) {
+    canToggleBiography.value = false
+    isBiographyExpanded.value = false
+    return
+  }
+
+  const wasExpanded = isBiographyExpanded.value
+  if (wasExpanded) {
+    isBiographyExpanded.value = false
+    await nextTick()
+  }
+
+  canToggleBiography.value = biographyElement.scrollHeight > biographyElement.clientHeight + 2
+
+  if (wasExpanded && canToggleBiography.value) {
+    isBiographyExpanded.value = true
+    await nextTick()
+  }
+}
+
+function toggleBiography() {
+  isBiographyExpanded.value = !isBiographyExpanded.value
+}
+
+function handleBiographyResize() {
+  if (biographyResizeTimer) {
+    clearTimeout(biographyResizeTimer)
+  }
+
+  biographyResizeTimer = setTimeout(() => {
+    void updateBiographyToggle()
+  }, 120)
 }
 
 function getImageUrl(path: string | null, size: string) {
@@ -233,6 +287,18 @@ watch(() => route.params.id, () => {
 }, {
   immediate: true
 })
+
+onMounted(() => {
+  window.addEventListener('resize', handleBiographyResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleBiographyResize)
+
+  if (biographyResizeTimer) {
+    clearTimeout(biographyResizeTimer)
+  }
+})
 </script>
 
 <template>
@@ -297,7 +363,23 @@ watch(() => route.params.id, () => {
         <main class="person-main">
           <section class="detail-panel">
             <h2>人物简介</h2>
-            <p class="biography">{{ person.biography || '暂无人物简介' }}</p>
+            <div
+              class="biography-wrap"
+              :class="{
+                collapsible: canToggleBiography,
+                expanded: isBiographyExpanded
+              }"
+            >
+              <p ref="biographyRef" class="biography">{{ person.biography || '暂无人物简介' }}</p>
+              <button
+                v-if="canToggleBiography"
+                type="button"
+                class="biography-toggle"
+                @click="toggleBiography"
+              >
+                {{ isBiographyExpanded ? '收起' : '展开' }}
+              </button>
+            </div>
           </section>
 
           <section class="detail-panel works-panel">
@@ -576,6 +658,24 @@ watch(() => route.params.id, () => {
   color: #3f4654;
   font-size: 14px;
   line-height: 1.85;
+}
+
+.biography-wrap {
+  position: relative;
+}
+
+.biography-toggle {
+  display: none;
+  position: relative;
+  z-index: 1;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #1677ff;
+  font-size: 14px;
+  font-weight: 850;
+  cursor: pointer;
 }
 
 .panel-heading {
@@ -880,10 +980,32 @@ watch(() => route.params.id, () => {
   }
 
   .biography {
-    max-height: 150px;
-    overflow: hidden;
     font-size: 13px;
     line-height: 1.75;
+  }
+
+  .biography-wrap.collapsible:not(.expanded) {
+    padding-bottom: 2px;
+  }
+
+  .biography-wrap.collapsible:not(.expanded) .biography {
+    max-height: 150px;
+    overflow: hidden;
+  }
+
+  .biography-wrap.collapsible:not(.expanded)::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 34px;
+    height: 54px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 82%);
+    pointer-events: none;
+  }
+
+  .biography-toggle {
+    display: inline-flex;
   }
 
   .panel-heading {
