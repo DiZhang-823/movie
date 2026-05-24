@@ -54,7 +54,7 @@ const router = createRouter({
                 {
                     path: '/admin/tmdb-import',
                     name: 'AdminTmdbImport',
-                    meta: { title: 'TMDB导入管理', requiresAdmin: true },
+                    meta: { title: '后台管理', requiresAdmin: true },
                     component: AdminTmdbImportPage
                 }
             ]

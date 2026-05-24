@@ -416,6 +416,9 @@ public class MovieService {
         response.setReleaseDate(movie.getReleaseDate());
         response.setVoteAverage(movie.getVoteAverage());
         response.setVoteCount(movie.getVoteCount());
+        response.setImdbVoteAverage(movie.getImdbVoteAverage());
+        response.setImdbVoteCount(movie.getImdbVoteCount());
+        response.setImdbRatingUpdatedAt(movie.getImdbRatingUpdatedAt());
         response.setPosterPath(movie.getPosterPath());
         response.setCreatedAt(movie.getCreatedAt());
         if (userMovie != null) {
@@ -441,6 +444,9 @@ public class MovieService {
         response.setRuntime(movie.getRuntime());
         response.setVoteAverage(movie.getVoteAverage());
         response.setVoteCount(movie.getVoteCount());
+        response.setImdbVoteAverage(movie.getImdbVoteAverage());
+        response.setImdbVoteCount(movie.getImdbVoteCount());
+        response.setImdbRatingUpdatedAt(movie.getImdbRatingUpdatedAt());
         response.setPosterPath(movie.getPosterPath());
         response.setImdbId(movie.getImdbId());
 

@@ -7,7 +7,7 @@
         <nav class="nav-menu">
           <router-link to="/movies">电影</router-link>
           <router-link to="/persons">人物</router-link>
-          <router-link v-if="currentUser?.isAdmin" to="/admin/tmdb-import">TMDB导入</router-link>
+          <router-link v-if="currentUser?.isAdmin" to="/admin/tmdb-import">后台管理</router-link>
         </nav>
 
         <div class="user-box">

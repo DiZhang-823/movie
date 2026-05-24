@@ -4,6 +4,8 @@ import {
   fetchTmdbImportStatus,
   runTmdbImportBatch,
   setTmdbImportEnabled,
+  syncImdbRatings,
+  type ImdbRatingsSyncResult,
   type TmdbImportStatus
 } from '../api/tmdbImport'
 
@@ -11,8 +13,10 @@ const status = ref<TmdbImportStatus | null>(null)
 const loading = ref(false)
 const switching = ref(false)
 const running = ref(false)
+const imdbSyncing = ref(false)
 const tmdbId = ref<number | null>(null)
 const importCount = ref(1)
+const imdbSyncResult = ref<ImdbRatingsSyncResult | null>(null)
 const message = ref('')
 const errorMessage = ref('')
 
@@ -96,6 +100,24 @@ async function runBatch() {
   }
 }
 
+async function runImdbSync() {
+  imdbSyncing.value = true
+  imdbSyncResult.value = null
+  message.value = ''
+  errorMessage.value = ''
+
+  try {
+    const result = await syncImdbRatings()
+    imdbSyncResult.value = result
+    message.value = `IMDb 评分同步完成：本地有 IMDb ID 的电影 ${result.moviesWithImdbId} 部，匹配 ${result.matchedMovies} 部，更新 ${result.updatedMovies} 部`
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = 'IMDb 评分同步失败，请稍后重试或查看后端日志'
+  } finally {
+    imdbSyncing.value = false
+  }
+}
+
 onMounted(() => {
   loadStatus()
 })
@@ -106,8 +128,8 @@ onMounted(() => {
     <section class="panel">
       <div class="panel-header">
         <div>
-          <h1>TMDB 导入管理</h1>
-          <p>查看当前进度，暂停或开启定时导入，也可以手动批量导入指定电影。</p>
+          <h1>后台管理</h1>
+          <p>管理 TMDB 电影导入任务，也可以手动同步 IMDb 评分和评分人数。</p>
         </div>
         <button class="refresh-btn" :disabled="loading" @click="loadStatus">
           {{ loading ? '刷新中' : '刷新' }}
@@ -142,7 +164,7 @@ onMounted(() => {
     </section>
 
     <section class="panel">
-      <h2>手动批量导入</h2>
+      <h2>手动批量导入 TMDB 电影</h2>
       <p>从输入的 TMDB ID 开始，按 ID 递增导入指定次数。导入次数默认 1。</p>
       <div class="run-form">
         <label class="form-field">
@@ -166,6 +188,45 @@ onMounted(() => {
         <button class="primary-btn" :disabled="running" @click="runBatch">
           {{ running ? '导入中' : '立即导入' }}
         </button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>手动同步 IMDb 评分</h2>
+          <p>点击后会下载 IMDb 官方评分数据集，并用电影表里的 IMDb ID 更新 IMDb 评分和评分人数。</p>
+        </div>
+        <button class="primary-btn" :disabled="imdbSyncing" @click="runImdbSync">
+          {{ imdbSyncing ? '同步中' : '立即同步' }}
+        </button>
+      </div>
+
+      <div v-if="imdbSyncResult" class="result-grid">
+        <div class="status-item">
+          <span>本地 IMDb ID</span>
+          <strong>{{ imdbSyncResult.moviesWithImdbId }}</strong>
+        </div>
+        <div class="status-item">
+          <span>数据集总行数</span>
+          <strong>{{ imdbSyncResult.totalRatingsRows }}</strong>
+        </div>
+        <div class="status-item">
+          <span>匹配电影</span>
+          <strong>{{ imdbSyncResult.matchedMovies }}</strong>
+        </div>
+        <div class="status-item">
+          <span>已更新</span>
+          <strong>{{ imdbSyncResult.updatedMovies }}</strong>
+        </div>
+        <div class="status-item">
+          <span>未匹配</span>
+          <strong>{{ imdbSyncResult.missingMovies }}</strong>
+        </div>
+        <div class="status-item">
+          <span>完成时间</span>
+          <strong>{{ imdbSyncResult.finishedAt }}</strong>
+        </div>
       </div>
     </section>
 
@@ -214,7 +275,8 @@ p {
   color: #6b7280;
 }
 
-.status-grid {
+.status-grid,
+.result-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -237,6 +299,7 @@ p {
 .status-item strong {
   color: #16803c;
   font-size: 18px;
+  word-break: break-word;
 }
 
 .status-item strong.paused {
@@ -285,6 +348,7 @@ button {
   border-radius: 6px;
   padding: 0 16px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 button:disabled {
@@ -335,7 +399,8 @@ button:disabled {
     flex-direction: column;
   }
 
-  .status-grid {
+  .status-grid,
+  .result-grid {
     grid-template-columns: 1fr;
   }
 

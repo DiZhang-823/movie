@@ -19,6 +19,9 @@ public class MovieResponse {
     private LocalDate releaseDate;
     private BigDecimal voteAverage;
     private Integer voteCount;
+    private BigDecimal imdbVoteAverage;
+    private Integer imdbVoteCount;
+    private LocalDateTime imdbRatingUpdatedAt;
     private String posterPath;
     private LocalDateTime createdAt;
     private UserMovieStatus userMovieStatus;

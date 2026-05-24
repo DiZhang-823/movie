@@ -22,6 +22,17 @@ export type TmdbImportRunResult = {
     items: TmdbImportRunItem[]
 }
 
+export type ImdbRatingsSyncResult = {
+    datasetUrl: string
+    moviesWithImdbId: number
+    totalRatingsRows: number
+    matchedMovies: number
+    updatedMovies: number
+    missingMovies: number
+    startedAt: string
+    finishedAt: string
+}
+
 export async function fetchTmdbImportStatus(): Promise<TmdbImportStatus> {
     const response = await request('/admin/tmdb-import/status')
     if (!response.ok) {
@@ -61,6 +72,17 @@ export async function runTmdbImportBatch(tmdbId: number, count = 1): Promise<Tmd
     if (!response.ok) {
         const text = await response.text()
         throw new Error(text || 'Failed to run TMDB import')
+    }
+    return await response.json()
+}
+
+export async function syncImdbRatings(): Promise<ImdbRatingsSyncResult> {
+    const response = await request('/admin/imdb-ratings/sync', {
+        method: 'POST'
+    })
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Failed to sync IMDb ratings')
     }
     return await response.json()
 }

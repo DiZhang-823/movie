@@ -48,6 +48,15 @@ public class Movie {
     @Column(name = "vote_count")
     private Integer voteCount;
 
+    @Column(name = "imdb_vote_average", precision = 10, scale = 4)
+    private BigDecimal imdbVoteAverage;
+
+    @Column(name = "imdb_vote_count")
+    private Integer imdbVoteCount;
+
+    @Column(name = "imdb_rating_updated_at")
+    private LocalDateTime imdbRatingUpdatedAt;
+
     @Column(name = "poster_path")
     private String posterPath;
 

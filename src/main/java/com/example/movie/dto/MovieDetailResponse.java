@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -20,6 +21,9 @@ public class MovieDetailResponse {
     private Integer runtime;
     private BigDecimal voteAverage;
     private Integer voteCount;
+    private BigDecimal imdbVoteAverage;
+    private Integer imdbVoteCount;
+    private LocalDateTime imdbRatingUpdatedAt;
     private String posterPath;
     private String imdbId;
 

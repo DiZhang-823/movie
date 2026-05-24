@@ -9,6 +9,9 @@ export interface MovieItem {
     releaseDate: string | null
     voteAverage: number | null
     voteCount: number | null
+    imdbVoteAverage: number | null
+    imdbVoteCount: number | null
+    imdbRatingUpdatedAt: string | null
     posterPath: string | null
     createdAt: string
     userMovieStatus: 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | null
@@ -71,6 +74,9 @@ export type MovieDetail = {
     runtime: number | null
     voteAverage: number | null
     voteCount: number | null
+    imdbVoteAverage: number | null
+    imdbVoteCount: number | null
+    imdbRatingUpdatedAt: string | null
     posterPath: string | null
     imdbId: string | null
     genres: string[]
