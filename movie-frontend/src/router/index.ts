@@ -3,6 +3,7 @@ import Layout from '../layout/Layout.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import MoviesPage from '../pages/MoviesPage.vue'
 import MovieDetailPage from '../pages/MovieDetailPage.vue'
+import PersonDetailPage from '../pages/PersonDetailPage.vue'
 import PersonsPage from '../pages/PersonsPage.vue'
 import RegisterPage from '../pages/RegisterPage.vue'
 import AdminTmdbImportPage from '../pages/AdminTmdbImportPage.vue'
@@ -39,6 +40,10 @@ const router = createRouter({
                 {
                     path: 'persons',
                     component: PersonsPage
+                },
+                {
+                    path: '/persons/:id',
+                    component: PersonDetailPage
                 },
                 {
                     path: '/register',

@@ -604,10 +604,11 @@ watch(() => route.params.id, () => {
           <section v-if="displayDirectors.length > 0" class="detail-section mobile-directors">
             <h2>导演</h2>
             <div class="compact-people-list">
-              <div
+              <RouterLink
                 v-for="person in displayDirectors"
                 :key="`mobile-director-${person.personId}`"
                 class="compact-person"
+                :to="`/persons/${person.personId}`"
               >
                 <img
                   v-if="person.profilePath"
@@ -619,7 +620,7 @@ watch(() => route.params.id, () => {
                   <strong>{{ person.name }}</strong>
                   <span>{{ getPersonSubtitle(person) }}</span>
                 </div>
-              </div>
+              </RouterLink>
             </div>
           </section>
 
@@ -631,10 +632,11 @@ watch(() => route.params.id, () => {
                 class="people-grid cast-list"
                 :style="{ maxHeight: castListMaxHeight }"
               >
-                <article
+                <RouterLink
                   v-for="person in displayCast"
                   :key="`cast-${person.personId}-${person.name}`"
                   class="person-card"
+                  :to="`/persons/${person.personId}`"
                 >
                   <img
                     v-if="person.profilePath"
@@ -650,7 +652,7 @@ watch(() => route.params.id, () => {
                     <div class="person-name">{{ person.name || '未知姓名' }}</div>
                     <div class="person-role">{{ getPersonRole(person) }}</div>
                   </div>
-                </article>
+                </RouterLink>
               </div>
 
               <div v-if="hasMoreCast" class="expand-wrap">
@@ -686,10 +688,11 @@ watch(() => route.params.id, () => {
           <section v-if="displayDirectors.length > 0" class="side-panel">
             <h2>导演</h2>
             <div class="compact-people-list">
-              <div
+              <RouterLink
                 v-for="person in displayDirectors"
                 :key="`director-${person.personId}`"
                 class="compact-person"
+                :to="`/persons/${person.personId}`"
               >
                 <img
                   v-if="person.profilePath"
@@ -701,7 +704,7 @@ watch(() => route.params.id, () => {
                   <strong>{{ person.name }}</strong>
                   <span>{{ getPersonSubtitle(person) }}</span>
                 </div>
-              </div>
+              </RouterLink>
             </div>
           </section>
         </aside>
@@ -1261,6 +1264,8 @@ watch(() => route.params.id, () => {
   background: #fff;
   border: 1px solid #e7ebf0;
   border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -1426,6 +1431,8 @@ watch(() => route.params.id, () => {
   grid-template-columns: 48px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
+  color: inherit;
+  text-decoration: none;
 }
 
 .compact-person img,

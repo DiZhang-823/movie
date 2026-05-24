@@ -1,10 +1,11 @@
 package com.example.movie.service;
 
-import com.example.movie.entity.Genre;
+import com.example.movie.dto.PersonDetailResponse;
+import com.example.movie.dto.PersonMovieCreditResponse;
 import com.example.movie.entity.Movie;
 import com.example.movie.entity.MoviePerson;
 import com.example.movie.entity.Person;
-import com.example.movie.repository.GenreRepository;
+import com.example.movie.exception.ResourceNotFoundException;
 import com.example.movie.repository.MoviePersonRepository;
 import com.example.movie.repository.PersonRepository;
 import com.example.movie.tmdb.TmdbClient;
@@ -13,7 +14,9 @@ import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -38,6 +41,32 @@ public class PersonService {
 
     public TmdbPersonResponse fetchPersonByIdFromTmdb(Long personId) {
         return tmdbClient.getPersonById(personId);
+    }
+
+    public PersonDetailResponse getPersonById(Long personId) {
+        Person person = personRepository.findById(personId)
+                .orElseThrow(() -> new ResourceNotFoundException("Person not found with id:" + personId));
+        List<MoviePerson> moviePersons = moviePersonRepository.findByPersonIdWithMovieOrderByReleaseDateDesc(personId);
+
+        PersonDetailResponse response = new PersonDetailResponse();
+        response.setId(person.getId());
+        response.setTmdbId(person.getTmdbId());
+        response.setName(person.getName());
+        response.setOriginalName(person.getOriginalName());
+        response.setGender(person.getGender());
+        response.setBirthday(person.getBirthday());
+        response.setDeathday(person.getDeathday());
+        response.setPlaceOfBirth(person.getPlaceOfBirth());
+        response.setBiography(person.getBiography());
+        response.setKnownForDepartment(person.getKnownForDepartment());
+        response.setProfilePath(person.getProfilePath());
+        response.setPopularity(person.getPopularity());
+
+        List<PersonMovieCreditResponse> credits = convertToMovieCredits(moviePersons);
+        response.setMovieCreditCount(credits.size());
+        response.setCredits(credits);
+
+        return response;
     }
 
     @Transactional
@@ -117,6 +146,41 @@ public class PersonService {
             moviePerson.setJob(crew.getJob());
             moviePersonRepository.save(moviePerson);
         }
+    }
+
+    private List<PersonMovieCreditResponse> convertToMovieCredits(List<MoviePerson> moviePersons) {
+        Map<Long, PersonMovieCreditResponse> creditsByMovieId = new LinkedHashMap<>();
+
+        for (MoviePerson moviePerson : moviePersons) {
+            Movie movie = moviePerson.getMovie();
+            PersonMovieCreditResponse credit = creditsByMovieId.computeIfAbsent(movie.getId(), movieId -> {
+                PersonMovieCreditResponse item = new PersonMovieCreditResponse();
+                item.setMovieId(movie.getId());
+                item.setTmdbId(movie.getTmdbId());
+                item.setTitle(movie.getTitle());
+                item.setOriginalTitle(movie.getOriginalTitle());
+                item.setReleaseDate(movie.getReleaseDate());
+                item.setVoteAverage(movie.getVoteAverage());
+                item.setVoteCount(movie.getVoteCount());
+                item.setPosterPath(movie.getPosterPath());
+                item.setJobs(new ArrayList<>());
+                return item;
+            });
+
+            if (hasText(moviePerson.getJob())
+                    && credit.getJobs().stream().noneMatch(job -> job.equalsIgnoreCase(moviePerson.getJob()))) {
+                credit.getJobs().add(moviePerson.getJob());
+            }
+            if (!hasText(credit.getCharacter()) && hasText(moviePerson.getCharacterName())) {
+                credit.setCharacter(moviePerson.getCharacterName());
+            }
+        }
+
+        return new ArrayList<>(creditsByMovieId.values());
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
 //    public List<Genre> getAllLocalGenres() {

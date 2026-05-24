@@ -1,14 +1,10 @@
 package com.example.movie.controller;
 
-import com.example.movie.entity.Genre;
-import com.example.movie.service.GenreService;
+import com.example.movie.dto.PersonDetailResponse;
 import com.example.movie.service.PersonService;
-import com.example.movie.tmdb.dto.TmdbGenreDto;
 import com.example.movie.tmdb.dto.TmdbPersonResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/persons")
@@ -25,6 +21,11 @@ public class PersonController {
     @GetMapping("/tmdb/get/{personId}")
     public TmdbPersonResponse getPersonByIdFromTmdb(@PathVariable Long personId) {
         return personService.fetchPersonByIdFromTmdb(personId);
+    }
+
+    @GetMapping("/{personId}")
+    public PersonDetailResponse getPersonById(@PathVariable Long personId) {
+        return personService.getPersonById(personId);
     }
 
 //    // 从 TMDB 拉取并保存到本地数据库

@@ -19,6 +19,17 @@ public interface MoviePersonRepository extends JpaRepository<MoviePerson, Long> 
     """)
     List<MoviePerson> findByMovieIdWithPersonOrderBySortOrderAsc(@Param("movieId") Long movieId);
 
+    @Query("""
+        SELECT mp FROM MoviePerson mp
+        JOIN FETCH mp.movie
+        WHERE mp.person.id = :personId
+        ORDER BY
+            CASE WHEN mp.movie.releaseDate IS NULL THEN 1 ELSE 0 END,
+            mp.movie.releaseDate DESC,
+            mp.movie.id DESC,
+            mp.sortOrder ASC
+    """)
+    List<MoviePerson> findByPersonIdWithMovieOrderByReleaseDateDesc(@Param("personId") Long personId);
+
     List<MoviePerson> findByMovieIdOrderBySortOrderAsc(Long movieId);
 }
-
