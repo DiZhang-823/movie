@@ -1914,6 +1914,10 @@ onBeforeUnmount(() => {
     flex-wrap: nowrap;
   }
 
+  .year-number-option {
+    width: 68px;
+  }
+
   .older-year-select {
     flex: 0 0 auto;
   }
