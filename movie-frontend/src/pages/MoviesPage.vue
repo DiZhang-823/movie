@@ -668,6 +668,44 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <div class="filter-row">
+        <span class="label">年份：</span>
+        <div class="options year-options">
+          <span
+            class="option"
+            :class="{ active: selectedYear === null }"
+            @click="handleYearClick(null)"
+          >
+            全部
+          </span>
+          <span
+            v-for="year in recentYears"
+            :key="year"
+            class="option"
+            :class="{ active: selectedYear === year }"
+            @click="handleYearClick(year)"
+          >
+            {{ year }}
+          </span>
+
+          <select
+            class="older-year-select"
+            :class="{ active: isOlderYearSelected }"
+            :value="isOlderYearSelected ? selectedYear : ''"
+            @change="handleOlderYearChange"
+          >
+            <option value="">更早年份</option>
+            <option
+              v-for="year in olderYears"
+              :key="year"
+              :value="year"
+            >
+              {{ year }}
+            </option>
+          </select>
+        </div>
+      </div>
+
       <div v-if="isUserLoggedIn" class="filter-row">
         <span class="label">状态：</span>
         <div class="options">
@@ -755,44 +793,6 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="filter-row">
-        <span class="label">年份：</span>
-        <div class="options year-options">
-          <span
-            class="option"
-            :class="{ active: selectedYear === null }"
-            @click="handleYearClick(null)"
-          >
-            全部
-          </span>
-          <span
-            v-for="year in recentYears"
-            :key="year"
-            class="option"
-            :class="{ active: selectedYear === year }"
-            @click="handleYearClick(year)"
-          >
-            {{ year }}
-          </span>
-
-          <select
-            class="older-year-select"
-            :class="{ active: isOlderYearSelected }"
-            :value="isOlderYearSelected ? selectedYear : ''"
-            @change="handleOlderYearChange"
-          >
-            <option value="">更早年份</option>
-            <option
-              v-for="year in olderYears"
-              :key="year"
-              :value="year"
-            >
-              {{ year }}
-            </option>
-          </select>
         </div>
       </div>
 
