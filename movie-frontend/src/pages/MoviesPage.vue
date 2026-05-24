@@ -681,7 +681,7 @@ onBeforeUnmount(() => {
           <span
             v-for="year in recentYears"
             :key="year"
-            class="option"
+            class="option year-number-option"
             :class="{ active: selectedYear === year }"
             @click="handleYearClick(year)"
           >
@@ -1069,7 +1069,7 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
-.year-options .option {
+.year-number-option {
   width: 52px;
   height: 28px;
   padding: 0;
