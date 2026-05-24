@@ -1917,9 +1917,9 @@ onBeforeUnmount(() => {
   }
 
   .year-number-option {
-    width: 76px;
-    min-width: 76px;
-    flex-basis: 76px;
+    width: 60px;
+    min-width: 60px;
+    flex-basis: 60px;
   }
 
   .older-year-select {
