@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecificationExecutor<Movie> {
@@ -37,5 +38,15 @@ public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecific
             @Param("genreId") Long genreId,
             Pageable pageable
     );
+
+    @Query("""
+        SELECT m FROM Movie m
+        WHERE m.collectionId = :collectionId
+        ORDER BY
+            CASE WHEN m.releaseDate IS NULL THEN 1 ELSE 0 END,
+            m.releaseDate ASC,
+            m.id ASC
+    """)
+    List<Movie> findByCollectionIdOrderByReleaseDateAsc(@Param("collectionId") Long collectionId);
 
 }

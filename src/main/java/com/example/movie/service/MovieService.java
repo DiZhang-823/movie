@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @Service
 public class MovieService {
@@ -455,6 +456,8 @@ public class MovieService {
                         .toList()
         );
 
+        populateCollectionMovies(response, movie);
+
         List<MoviePerson> moviePersons = moviePersonRepository.findByMovieIdWithPersonOrderBySortOrderAsc(movie.getId());
 
         response.setDirectors(
@@ -471,6 +474,39 @@ public class MovieService {
                         .toList()
         );
 
+        return response;
+    }
+
+    private void populateCollectionMovies(MovieDetailResponse response, Movie movie) {
+        if (movie.getCollectionId() == null) {
+            response.setCollectionMovies(List.of());
+            return;
+        }
+
+        collectionRepository.findByTmdbId(movie.getCollectionId())
+                .ifPresent(collection -> response.setCollectionName(collection.getName()));
+
+        List<Movie> collectionMovies = movieRepository.findByCollectionIdOrderByReleaseDateAsc(movie.getCollectionId());
+        response.setCollectionMovies(
+                IntStream.range(0, collectionMovies.size())
+                        .mapToObj(index -> convertToCollectionItemResponse(
+                                collectionMovies.get(index),
+                                index + 1
+                        ))
+                        .filter(collectionMovie -> !collectionMovie.getId().equals(movie.getId()))
+                        .toList()
+        );
+    }
+
+    private MovieCollectionItemResponse convertToCollectionItemResponse(Movie movie, int sequenceNumber) {
+        MovieCollectionItemResponse response = new MovieCollectionItemResponse();
+        response.setId(movie.getId());
+        response.setTmdbId(movie.getTmdbId());
+        response.setTitle(movie.getTitle());
+        response.setReleaseDate(movie.getReleaseDate());
+        response.setVoteAverage(movie.getVoteAverage());
+        response.setPosterPath(movie.getPosterPath());
+        response.setSequenceNumber(sequenceNumber);
         return response;
     }
 

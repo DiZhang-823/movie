@@ -27,6 +27,9 @@ public class MovieDetailResponse {
     private List<String> companies;
     private List<String> countries;
 
+    private String collectionName;
+    private List<MovieCollectionItemResponse> collectionMovies;
+
     private List<PersonItemResponse> directors;
     private List<PersonItemResponse> cast;
 }

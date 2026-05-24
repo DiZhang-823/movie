@@ -49,6 +49,16 @@ export type PersonItem = {
     job: string | null
 }
 
+export type MovieCollectionItem = {
+    id: number
+    tmdbId: number
+    title: string
+    releaseDate: string | null
+    voteAverage: number | null
+    posterPath: string | null
+    sequenceNumber: number
+}
+
 export type MovieDetail = {
     id: number
     tmdbId: number
@@ -66,6 +76,8 @@ export type MovieDetail = {
     genres: string[]
     companies: string[]
     countries: string[]
+    collectionName: string | null
+    collectionMovies: MovieCollectionItem[]
     directors: PersonItem[]
     cast: PersonItem[]
 }

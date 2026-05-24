@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getMovieById, type MovieDetail, type PersonItem } from '@/api/movie'
+import { getMovieById, type MovieCollectionItem, type MovieDetail, type PersonItem } from '@/api/movie'
 import { getUserMovie, saveUserMovie, type UserMovieResponse } from '@/api/userMovie'
 
 const route = useRoute()
@@ -32,6 +32,8 @@ const displayCast = computed(() => {
 })
 
 const displayDirectors = computed(() => movie.value?.directors ?? [])
+
+const collectionMovies = computed(() => movie.value?.collectionMovies ?? [])
 
 const hasMoreCast = computed(() => {
   if (!movie.value?.cast) {
@@ -75,6 +77,32 @@ async function loadMovieDetail() {
     errorMessage.value = '加载电影详情失败'
   } finally {
     loading.value = false
+  }
+}
+
+async function loadDetailPage() {
+  visibleCastCount.value = 12
+  castListMaxHeight.value = 'none'
+  userMovie.value = null
+  showWatchedPanel.value = false
+
+  await loadMovieDetail()
+  await nextTick()
+  updateCastListMaxHeight()
+
+  if (movie.value) {
+    document.title = `${movie.value.title} - 详情`
+  }
+
+  const token = localStorage.getItem('token')
+  if (!token || !movie.value) {
+    return
+  }
+
+  try {
+    userMovie.value = await getUserMovie(movie.value.id, token)
+  } catch (e) {
+    console.error(e)
   }
 }
 
@@ -142,6 +170,14 @@ function formatReleaseDate(value: string | null | undefined) {
   }
 
   return `${year}-${month}-${day}`
+}
+
+function formatYear(value: string | null | undefined) {
+  if (!value) {
+    return '未知'
+  }
+
+  return value.slice(0, 4)
 }
 
 function formatList(list: string[] | null | undefined) {
@@ -212,6 +248,10 @@ function getPersonSubtitle(person: PersonItem) {
   }
 
   return person.job || ''
+}
+
+function getCollectionPosterUrl(item: MovieCollectionItem) {
+  return item.posterPath ? getImageUrl(item.posterPath, 'w185') : ''
 }
 
 async function expandCast() {
@@ -356,24 +396,10 @@ watch([watchedYear, watchedMonth], () => {
   }
 })
 
-onMounted(async () => {
-  await loadMovieDetail()
-  await nextTick()
-  updateCastListMaxHeight()
-  if (movie.value) {
-    document.title = `${movie.value.title} - 详情`
-  }
-
-  const token = localStorage.getItem('token')
-  if (!token) return
-
-  try {
-    if (movie.value) {
-      userMovie.value = await getUserMovie(movie.value.id, token)
-    }
-  } catch (e) {
-    console.error(e)
-  }
+watch(() => route.params.id, () => {
+  void loadDetailPage()
+}, {
+  immediate: true
 })
 </script>
 
@@ -527,6 +553,50 @@ onMounted(async () => {
               <div class="fact-item">
                 <span>票房</span>
                 <strong>{{ formatRevenue(movie.revenue) }}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section v-if="collectionMovies.length > 0" class="detail-section collection-section">
+            <div class="collection-header">
+              <div class="collection-title-row">
+                <h2>同系列作品</h2>
+                <span v-if="movie.collectionName" class="collection-pill">
+                  {{ movie.collectionName }}
+                </span>
+              </div>
+            </div>
+
+            <div class="collection-strip">
+              <div class="collection-track">
+                <RouterLink
+                  v-for="item in collectionMovies"
+                  :key="item.id"
+                  class="collection-card"
+                  :to="`/movies/${item.id}`"
+                >
+                  <div class="collection-thumb">
+                    <img
+                      v-if="getCollectionPosterUrl(item)"
+                      :src="getCollectionPosterUrl(item)"
+                      :alt="item.title"
+                    />
+                    <div v-else class="collection-thumb-placeholder">
+                      {{ item.title.slice(0, 1) }}
+                    </div>
+                    <span class="collection-order">{{ item.sequenceNumber }}</span>
+                  </div>
+
+                  <div class="collection-card-info">
+                    <div class="collection-card-title">{{ item.title }}</div>
+                    <div class="collection-card-date">{{ formatReleaseDate(item.releaseDate) }}</div>
+                  </div>
+
+                  <div class="collection-card-side">
+                    <div class="collection-card-year">{{ formatYear(item.releaseDate) }}</div>
+                    <div class="collection-card-rating">{{ formatVoteAverage(item.voteAverage) }}</div>
+                  </div>
+                </RouterLink>
               </div>
             </div>
           </section>
@@ -1021,6 +1091,153 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 750;
   line-height: 1.45;
+}
+
+.collection-section {
+  overflow: hidden;
+  padding: 0;
+}
+
+.collection-header {
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.collection-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.collection-title-row h2 {
+  margin: 0;
+}
+
+.collection-pill {
+  min-height: 28px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: #edf5ff;
+  color: #1677ff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.collection-strip {
+  padding: 18px 24px 24px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.collection-track {
+  min-width: max-content;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 360px;
+  gap: 16px;
+}
+
+.collection-card {
+  min-height: 66px;
+  padding: 8px 12px 8px 8px;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #e6ebf1;
+  border-radius: 8px;
+  background: #fbfcfe;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.collection-card:hover {
+  transform: translateY(-2px);
+  border-color: #b9d6ff;
+  box-shadow: 0 14px 22px rgba(22, 119, 255, 0.12);
+}
+
+.collection-thumb {
+  position: relative;
+  width: 48px;
+  height: 56px;
+}
+
+.collection-thumb img,
+.collection-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #dfe7f1;
+}
+
+.collection-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #516176;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.collection-order {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.collection-card-info {
+  min-width: 0;
+}
+
+.collection-card-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #172033;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.collection-card-date {
+  margin-top: 5px;
+  color: #8a94a6;
+  font-size: 12px;
+}
+
+.collection-card-side {
+  min-width: 54px;
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.collection-card-year {
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.collection-card-rating {
+  color: #f59e0b;
+  font-size: 16px;
+  font-weight: 850;
 }
 
 .mobile-directors {
@@ -1676,6 +1893,36 @@ onMounted(async () => {
 
   .fact-item {
     min-height: 52px;
+  }
+
+  .collection-section {
+    padding: 0;
+  }
+
+  .collection-header {
+    padding: 18px 18px 12px;
+  }
+
+  .collection-strip {
+    margin-inline: -18px;
+    padding: 14px 18px 18px;
+    scroll-snap-type: x proximity;
+  }
+
+  .collection-track {
+    grid-auto-columns: min(82vw, 340px);
+    gap: 12px;
+    padding-right: 18px;
+  }
+
+  .collection-card {
+    scroll-snap-align: start;
+    gap: 10px;
+  }
+
+  .collection-card:hover {
+    transform: none;
+    box-shadow: none;
   }
 
   .mobile-directors {
