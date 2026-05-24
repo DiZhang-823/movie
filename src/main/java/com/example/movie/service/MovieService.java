@@ -292,7 +292,12 @@ public class MovieService {
             spec = spec.and(MovieSpecifications.hasRegion(movieQuery.getRegionCode()));
         }
         if (movieQuery.getUserMovieStatus() != null && currentUserId != null) {
-            if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.UNMARKED) {
+            if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.DEFAULT) {
+                spec = spec.and(MovieSpecifications.doesNotHaveUserMovieStatus(
+                        currentUserId,
+                        UserMovieStatus.NOT_INTERESTED
+                ));
+            } else if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.UNMARKED) {
                 spec = spec.and(MovieSpecifications.hasNoUserMovieMark(currentUserId));
             } else {
                 UserMovieStatus status = UserMovieStatus.valueOf(movieQuery.getUserMovieStatus().name());
@@ -355,7 +360,8 @@ public class MovieService {
         if (currentUserId == null || movieQuery.getUserMovieStatus() == null) {
             return false;
         }
-        if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.UNMARKED) {
+        if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.DEFAULT
+                || movieQuery.getUserMovieStatus() == UserMovieStatusFilter.UNMARKED) {
             return false;
         }
 

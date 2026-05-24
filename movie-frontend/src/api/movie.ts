@@ -31,7 +31,7 @@ export interface GetMoviesParams {
     genreId?: number
     year?: number
     regionCode?: string
-    userMovieStatus?: 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
+    userMovieStatus?: 'DEFAULT' | 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
     userRatingMin?: number
     userRatingMax?: number
     page?: number

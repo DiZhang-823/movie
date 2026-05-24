@@ -5,8 +5,8 @@ import { getGenres } from '../api/genre'
 import { saveUserMovie, type UserMovieRequest, type UserMovieStatus } from '../api/userMovie'
 import { getToken, isLoggedIn } from '../utils/auth'
 
-type UserMovieStatusFilter = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
-type MarkedUserMovieStatus = Exclude<UserMovieStatusFilter, 'UNMARKED'>
+type UserMovieStatusFilter = 'DEFAULT' | 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
+type MarkedUserMovieStatus = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED'
 type RatingRangeHandle = 'min' | 'max'
 type RatingRangeDragState = {
   handle: RatingRangeHandle | null
@@ -63,6 +63,7 @@ const selectedSort = ref({
 })
 
 const userMovieStatusOptions = ref<{ value: UserMovieStatusFilter | null; name: string }[]>([
+  { value: 'DEFAULT', name: '默认' },
   { value: null, name: '全部' },
   { value: 'WANT_TO_WATCH', name: '想看' },
   { value: 'WATCHED', name: '看过' },
@@ -70,8 +71,8 @@ const userMovieStatusOptions = ref<{ value: UserMovieStatusFilter | null; name: 
   { value: 'UNMARKED', name: '未标记' }
 ])
 const selectedUserMovieStatus = ref<{ value: UserMovieStatusFilter | null; name: string }>({
-  value: null,
-  name: '全部'
+  value: 'DEFAULT',
+  name: '默认'
 })
 const userRatingMin = ref(1)
 const userRatingMax = ref(5)

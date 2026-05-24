@@ -155,6 +155,23 @@ public class MovieSpecifications {
         };
     }
 
+    public static Specification<Movie> doesNotHaveUserMovieStatus(Long userId, UserMovieStatus status) {
+        return (root, query, cb) -> {
+            assert query != null;
+
+            Subquery<Long> subquery = query.subquery(Long.class);
+            Root<UserMovie> userMovieRoot = subquery.from(UserMovie.class);
+
+            subquery.select(userMovieRoot.get("movie").get("id"))
+                    .where(
+                            cb.equal(userMovieRoot.get("user").get("id"), userId),
+                            cb.equal(userMovieRoot.get("status"), status)
+                    );
+
+            return cb.not(root.get("id").in(subquery));
+        };
+    }
+
     private static void addUserRatingPredicates(
             List<Predicate> predicates,
             Root<UserMovie> userMovieRoot,
