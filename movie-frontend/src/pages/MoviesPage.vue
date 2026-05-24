@@ -1069,6 +1069,16 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 
+.year-options .option {
+  width: 52px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .older-year-select {
   height: 28px;
   padding: 0 28px 0 10px;
