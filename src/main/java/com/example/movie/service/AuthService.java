@@ -132,7 +132,9 @@ public class AuthService {
                 """.formatted(code));
 
         try {
+            log.info("Sending verification code email to {}", email);
             mailSender.send(message);
+            log.info("Verification code email sent to {}", email);
         } catch (MailAuthenticationException ex) {
             emailCodeMap.remove(email);
             log.error("Failed to authenticate with mail server when sending verification code to {}", email, ex);

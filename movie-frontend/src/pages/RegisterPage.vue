@@ -21,6 +21,14 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+function getRequestErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return '请求超时，请稍后重试'
+  }
+
+  return fallback
+}
+
 async function handleRegister() {
   errorMessage.value = ''
 
@@ -100,7 +108,7 @@ async function handleRegister() {
     })
   } catch (error) {
     console.error(error)
-    errorMessage.value = '注册失败'
+    errorMessage.value = getRequestErrorMessage(error, '注册失败')
   } finally {
     loading.value = false
   }
@@ -161,7 +169,7 @@ return
         }, 1000)
     } catch (error) {
         console.error(error)
-        errorMessage.value = '验证码发送失败'
+        errorMessage.value = getRequestErrorMessage(error, '验证码发送失败')
     } finally {
         sendingCode.value = false
     }
