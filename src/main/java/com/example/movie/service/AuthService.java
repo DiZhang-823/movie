@@ -6,18 +6,13 @@ import com.example.movie.dto.auth.RegisterRequest;
 import com.example.movie.dto.auth.RegisterResponse;
 import com.example.movie.entity.User;
 import com.example.movie.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.MailAuthenticationException;
-import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,25 +26,22 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final JavaMailSender mailSender;
-    private final String mailFrom;
+    private final EmailDeliveryService emailDeliveryService;
     private final Map<String, EmailCodeInfo> emailCodeMap = new ConcurrentHashMap<>();
 
-    public AuthService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder,
-                       JwtService jwtService,
-                       JavaMailSender mailSender,
-                       @Value("${spring.mail.username}") String mailFrom) {
+    public AuthService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            EmailDeliveryService emailDeliveryService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.mailSender = mailSender;
-        this.mailFrom = mailFrom;
+        this.emailDeliveryService = emailDeliveryService;
     }
 
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
-
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new IllegalArgumentException("用户名已被占用");
         }
@@ -73,7 +65,6 @@ public class AuthService {
             throw new RuntimeException("邮箱验证码错误");
         }
 
-
         User user = new User();
         user.setUsername(request.getUsername());
         user.setEmail(request.getEmail());
@@ -95,7 +86,10 @@ public class AuthService {
 
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Username or Password is incorrect"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED,
+                        "Username or Password is incorrect"
+                ));
 
         if (!Boolean.TRUE.equals(user.getEnabled())) {
             throw new IllegalArgumentException("User is disabled");
@@ -119,34 +113,17 @@ public class AuthService {
         long expireTime = System.currentTimeMillis() + 5 * 60 * 1000;
         emailCodeMap.put(email, new EmailCodeInfo(code, expireTime));
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
-        message.setTo(email);
-        message.setSubject("电影站注册验证码");
-        message.setText("""
-                您正在注册电影站账号。
-
-                验证码：%s
-
-                验证码 5 分钟内有效。如果不是您本人操作，请忽略这封邮件。
-                """.formatted(code));
-
         try {
             log.info("Sending verification code email to {}", email);
-            mailSender.send(message);
+            emailDeliveryService.sendVerificationCode(email, code);
             log.info("Verification code email sent to {}", email);
-        } catch (MailAuthenticationException ex) {
-            emailCodeMap.remove(email);
-            log.error("Failed to authenticate with mail server when sending verification code to {}", email, ex);
-            throw new RuntimeException("邮箱服务认证失败，请检查发件邮箱账号和应用专用密码");
-        } catch (MailException ex) {
+        } catch (EmailDeliveryException ex) {
             emailCodeMap.remove(email);
             log.error("Failed to send verification code email to {}", email, ex);
-            throw new RuntimeException("验证码发送失败，请稍后重试");
+            throw new RuntimeException(ex.getMessage());
         }
     }
 
     private record EmailCodeInfo(String code, long expireTime) {
     }
 }
-
