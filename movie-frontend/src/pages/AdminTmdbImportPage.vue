@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
+  fetchImdbRatingsSyncStatus,
   fetchTmdbImportStatus,
   runTmdbImportBatch,
   setTmdbImportEnabled,
   syncImdbRatings,
+  type ImdbRatingsSyncStatus,
   type ImdbRatingsSyncResult,
   type TmdbImportStatus
 } from '../api/tmdbImport'
@@ -17,6 +19,7 @@ const imdbSyncing = ref(false)
 const tmdbId = ref<number | null>(null)
 const importCount = ref(1)
 const imdbSyncResult = ref<ImdbRatingsSyncResult | null>(null)
+const imdbSyncStatus = ref<ImdbRatingsSyncStatus | null>(null)
 const message = ref('')
 const errorMessage = ref('')
 
@@ -42,6 +45,21 @@ async function loadStatus() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadImdbSyncStatus() {
+  try {
+    imdbSyncStatus.value = await fetchImdbRatingsSyncStatus()
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+async function refreshStatus() {
+  await Promise.all([
+    loadStatus(),
+    loadImdbSyncStatus()
+  ])
 }
 
 async function toggleImport() {
@@ -110,6 +128,7 @@ async function runImdbSync() {
     const result = await syncImdbRatings()
     imdbSyncResult.value = result
     message.value = `IMDb 评分同步完成：本地有 IMDb ID 的电影 ${result.moviesWithImdbId} 部，匹配 ${result.matchedMovies} 部，更新 ${result.updatedMovies} 部`
+    await loadImdbSyncStatus()
   } catch (error) {
     console.error(error)
     errorMessage.value = 'IMDb 评分同步失败，请稍后重试或查看后端日志'
@@ -118,8 +137,22 @@ async function runImdbSync() {
   }
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return '暂无'
+  }
+  return value.replace('T', ' ').slice(0, 19)
+}
+
+function formatNumber(value?: number | null) {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+  return value.toLocaleString()
+}
+
 onMounted(() => {
-  loadStatus()
+  refreshStatus()
 })
 </script>
 
@@ -131,7 +164,7 @@ onMounted(() => {
           <h1>后台管理</h1>
           <p>管理 TMDB 电影导入任务，也可以手动同步 IMDb 评分和评分人数。</p>
         </div>
-        <button class="refresh-btn" :disabled="loading" @click="loadStatus">
+        <button class="refresh-btn" :disabled="loading" @click="refreshStatus">
           {{ loading ? '刷新中' : '刷新' }}
         </button>
       </div>
@@ -200,6 +233,17 @@ onMounted(() => {
         <button class="primary-btn" :disabled="imdbSyncing" @click="runImdbSync">
           {{ imdbSyncing ? '同步中' : '立即同步' }}
         </button>
+      </div>
+
+      <div class="imdb-status-row">
+        <div class="status-item">
+          <span>上次同步时间</span>
+          <strong>{{ formatDateTime(imdbSyncStatus?.lastSyncedAt) }}</strong>
+        </div>
+        <div class="status-item">
+          <span>待补 IMDb 评分</span>
+          <strong>{{ formatNumber(imdbSyncStatus?.missingRatingCount) }}</strong>
+        </div>
       </div>
 
       <div v-if="imdbSyncResult" class="result-grid">
@@ -279,6 +323,13 @@ p {
 .result-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.imdb-status-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 22px;
 }
@@ -400,7 +451,8 @@ button:disabled {
   }
 
   .status-grid,
-  .result-grid {
+  .result-grid,
+  .imdb-status-row {
     grid-template-columns: 1fr;
   }
 

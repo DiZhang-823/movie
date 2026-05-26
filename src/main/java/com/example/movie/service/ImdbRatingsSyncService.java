@@ -1,6 +1,7 @@
 package com.example.movie.service;
 
 import com.example.movie.dto.ImdbRatingsSyncResponse;
+import com.example.movie.dto.ImdbRatingsSyncStatusResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,18 @@ public class ImdbRatingsSyncService {
                 imdb_vote_count = ?,
                 imdb_rating_updated_at = ?
             WHERE id = ?
+            """;
+    private static final String LAST_SYNCED_AT_SQL = """
+            SELECT MAX(imdb_rating_updated_at)
+            FROM movie
+            WHERE imdb_rating_updated_at IS NOT NULL
+            """;
+    private static final String MISSING_RATING_COUNT_SQL = """
+            SELECT COUNT(*)
+            FROM movie
+            WHERE imdb_id IS NOT NULL
+              AND TRIM(imdb_id) <> ''
+              AND (imdb_vote_average IS NULL OR imdb_vote_count IS NULL)
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -106,6 +119,16 @@ public class ImdbRatingsSyncService {
         response.setMissingMovies(moviesWithImdbId - matchedMovies);
         response.setStartedAt(startedAt);
         response.setFinishedAt(LocalDateTime.now());
+        return response;
+    }
+
+    public ImdbRatingsSyncStatusResponse getStatus() {
+        Timestamp lastSyncedAt = jdbcTemplate.queryForObject(LAST_SYNCED_AT_SQL, Timestamp.class);
+        Long missingRatingCount = jdbcTemplate.queryForObject(MISSING_RATING_COUNT_SQL, Long.class);
+
+        ImdbRatingsSyncStatusResponse response = new ImdbRatingsSyncStatusResponse();
+        response.setLastSyncedAt(lastSyncedAt == null ? null : lastSyncedAt.toLocalDateTime());
+        response.setMissingRatingCount(missingRatingCount == null ? 0 : missingRatingCount);
         return response;
     }
 
