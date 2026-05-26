@@ -36,6 +36,10 @@ export type ImdbRatingsSyncResult = {
 export type ImdbRatingsSyncStatus = {
     lastSyncedAt: string | null
     missingRatingCount: number
+    syncing: boolean
+    currentStartedAt: string | null
+    lastErrorMessage: string | null
+    lastResult: ImdbRatingsSyncResult | null
 }
 
 export async function fetchTmdbImportStatus(): Promise<TmdbImportStatus> {
@@ -89,7 +93,7 @@ export async function fetchImdbRatingsSyncStatus(): Promise<ImdbRatingsSyncStatu
     return await response.json()
 }
 
-export async function syncImdbRatings(): Promise<ImdbRatingsSyncResult> {
+export async function syncImdbRatings(): Promise<ImdbRatingsSyncStatus> {
     const response = await request('/admin/imdb-ratings/sync', {
         method: 'POST'
     })

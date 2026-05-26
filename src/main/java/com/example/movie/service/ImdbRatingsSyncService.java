@@ -2,9 +2,14 @@ package com.example.movie.service;
 
 import com.example.movie.dto.ImdbRatingsSyncResponse;
 import com.example.movie.dto.ImdbRatingsSyncStatusResponse;
+import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -23,11 +28,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.zip.GZIPInputStream;
 
 @Service
 public class ImdbRatingsSyncService {
 
+    private static final Logger log = LoggerFactory.getLogger(ImdbRatingsSyncService.class);
     private static final int BATCH_SIZE = 500;
     private static final String UPDATE_SQL = """
             UPDATE movie
@@ -50,27 +58,61 @@ public class ImdbRatingsSyncService {
             """;
 
     private final JdbcTemplate jdbcTemplate;
+    private final TransactionTemplate transactionTemplate;
     private final HttpClient httpClient;
+    private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
+    private volatile boolean syncing = false;
+    private volatile LocalDateTime currentStartedAt;
+    private volatile String lastErrorMessage;
+    private volatile ImdbRatingsSyncResponse lastResult;
 
     @Value("${imdb.ratings.url:https://datasets.imdbws.com/title.ratings.tsv.gz}")
     private String ratingsUrl;
 
-    public ImdbRatingsSyncService(JdbcTemplate jdbcTemplate) {
+    @Value("${imdb.ratings.timeout-minutes:15}")
+    private Long ratingsTimeoutMinutes;
+
+    public ImdbRatingsSyncService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager) {
         this.jdbcTemplate = jdbcTemplate;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
     }
 
-    public synchronized ImdbRatingsSyncResponse syncRatings() {
+    public synchronized ImdbRatingsSyncStatusResponse startSyncRatings() {
+        if (!syncing) {
+            syncing = true;
+            currentStartedAt = LocalDateTime.now();
+            lastErrorMessage = null;
+            syncExecutor.submit(this::runSyncJob);
+        }
+
+        return getStatus();
+    }
+
+    private void runSyncJob() {
+        try {
+            ImdbRatingsSyncResponse result = syncRatings();
+            lastResult = result;
+            lastErrorMessage = null;
+        } catch (Exception error) {
+            log.error("Failed to sync IMDb ratings", error);
+            lastErrorMessage = getRootErrorMessage(error);
+        } finally {
+            syncing = false;
+            currentStartedAt = null;
+        }
+    }
+
+    private ImdbRatingsSyncResponse syncRatings() {
         LocalDateTime startedAt = LocalDateTime.now();
         LocalDateTime ratingUpdatedAt = LocalDateTime.now();
         Map<String, List<Long>> movieIdsByImdbId = loadMovieIdsByImdbId();
         int moviesWithImdbId = movieIdsByImdbId.values().stream().mapToInt(List::size).sum();
         int totalRows = 0;
         int matchedMovies = 0;
-        int updatedMovies = 0;
-        List<Object[]> batchArgs = new ArrayList<>(BATCH_SIZE);
+        List<Object[]> updateArgs = new ArrayList<>();
 
         try (InputStream responseBody = openDatasetStream();
              GZIPInputStream gzipInputStream = new GZIPInputStream(responseBody);
@@ -92,23 +134,19 @@ public class ImdbRatingsSyncService {
 
                 matchedMovies += movieIds.size();
                 for (Long movieId : movieIds) {
-                    batchArgs.add(new Object[] {
+                    updateArgs.add(new Object[] {
                             new BigDecimal(columns[1]),
                             Integer.valueOf(columns[2]),
                             Timestamp.valueOf(ratingUpdatedAt),
                             movieId
                     });
                 }
-
-                if (batchArgs.size() >= BATCH_SIZE) {
-                    updatedMovies += flushBatch(batchArgs);
-                }
             }
-
-            updatedMovies += flushBatch(batchArgs);
         } catch (Exception error) {
             throw new IllegalStateException("Failed to sync IMDb ratings", error);
         }
+
+        int updatedMovies = updateMatchedMovies(updateArgs);
 
         ImdbRatingsSyncResponse response = new ImdbRatingsSyncResponse();
         response.setDatasetUrl(ratingsUrl);
@@ -129,6 +167,10 @@ public class ImdbRatingsSyncService {
         ImdbRatingsSyncStatusResponse response = new ImdbRatingsSyncStatusResponse();
         response.setLastSyncedAt(lastSyncedAt == null ? null : lastSyncedAt.toLocalDateTime());
         response.setMissingRatingCount(missingRatingCount == null ? 0 : missingRatingCount);
+        response.setSyncing(syncing);
+        response.setCurrentStartedAt(currentStartedAt);
+        response.setLastErrorMessage(lastErrorMessage);
+        response.setLastResult(lastResult);
         return response;
     }
 
@@ -151,7 +193,7 @@ public class ImdbRatingsSyncService {
 
     private InputStream openDatasetStream() throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create(ratingsUrl))
-                .timeout(Duration.ofMinutes(3))
+                .timeout(Duration.ofMinutes(ratingsTimeoutMinutes))
                 .GET()
                 .build();
         HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -166,14 +208,33 @@ public class ImdbRatingsSyncService {
         return imdbId == null ? "" : imdbId.trim().toLowerCase(Locale.ROOT);
     }
 
-    private int flushBatch(List<Object[]> batchArgs) {
-        if (batchArgs.isEmpty()) {
+    private int updateMatchedMovies(List<Object[]> updateArgs) {
+        if (updateArgs.isEmpty()) {
             return 0;
         }
 
-        int count = batchArgs.size();
-        jdbcTemplate.batchUpdate(UPDATE_SQL, batchArgs);
-        batchArgs.clear();
-        return count;
+        Integer updatedCount = transactionTemplate.execute(status -> {
+            int count = 0;
+            for (int index = 0; index < updateArgs.size(); index += BATCH_SIZE) {
+                List<Object[]> chunk = updateArgs.subList(index, Math.min(index + BATCH_SIZE, updateArgs.size()));
+                jdbcTemplate.batchUpdate(UPDATE_SQL, chunk);
+                count += chunk.size();
+            }
+            return count;
+        });
+        return updatedCount == null ? 0 : updatedCount;
+    }
+
+    private String getRootErrorMessage(Exception error) {
+        Throwable current = error;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null ? error.getMessage() : current.getMessage();
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        syncExecutor.shutdownNow();
     }
 }

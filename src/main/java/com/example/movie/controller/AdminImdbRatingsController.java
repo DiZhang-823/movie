@@ -1,6 +1,5 @@
 package com.example.movie.controller;
 
-import com.example.movie.dto.ImdbRatingsSyncResponse;
 import com.example.movie.dto.ImdbRatingsSyncStatusResponse;
 import com.example.movie.service.ImdbRatingsSyncService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,8 +18,8 @@ public class AdminImdbRatingsController {
     }
 
     @PostMapping("/sync")
-    public ImdbRatingsSyncResponse sync() {
-        return imdbRatingsSyncService.syncRatings();
+    public ImdbRatingsSyncStatusResponse sync() {
+        return imdbRatingsSyncService.startSyncRatings();
     }
 
     @GetMapping("/status")

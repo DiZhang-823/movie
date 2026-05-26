@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   fetchImdbRatingsSyncStatus,
   fetchTmdbImportStatus,
@@ -22,6 +22,7 @@ const imdbSyncResult = ref<ImdbRatingsSyncResult | null>(null)
 const imdbSyncStatus = ref<ImdbRatingsSyncStatus | null>(null)
 const message = ref('')
 const errorMessage = ref('')
+let imdbSyncPollTimer: number | undefined
 
 const statusText = computed(() => {
   if (!status.value) {
@@ -29,6 +30,8 @@ const statusText = computed(() => {
   }
   return status.value.enabled ? '运行中' : '已暂停'
 })
+
+const imdbSyncRunning = computed(() => imdbSyncing.value || imdbSyncStatus.value?.syncing === true)
 
 async function loadStatus() {
   loading.value = true
@@ -49,9 +52,18 @@ async function loadStatus() {
 
 async function loadImdbSyncStatus() {
   try {
-    imdbSyncStatus.value = await fetchImdbRatingsSyncStatus()
+    const nextStatus = await fetchImdbRatingsSyncStatus()
+    imdbSyncStatus.value = nextStatus
+    if (nextStatus.lastResult) {
+      imdbSyncResult.value = nextStatus.lastResult
+    }
+    if (nextStatus.syncing) {
+      startImdbSyncPolling()
+    }
+    return nextStatus
   } catch (error) {
     console.error(error)
+    return null
   }
 }
 
@@ -125,16 +137,63 @@ async function runImdbSync() {
   errorMessage.value = ''
 
   try {
-    const result = await syncImdbRatings()
-    imdbSyncResult.value = result
-    message.value = `IMDb 评分同步完成：本地有 IMDb ID 的电影 ${result.moviesWithImdbId} 部，匹配 ${result.matchedMovies} 部，更新 ${result.updatedMovies} 部`
-    await loadImdbSyncStatus()
+    const nextStatus = await syncImdbRatings()
+    imdbSyncStatus.value = nextStatus
+    if (nextStatus.lastResult) {
+      imdbSyncResult.value = nextStatus.lastResult
+    }
+    message.value = nextStatus.syncing
+      ? 'IMDb 评分同步已开始，页面会自动刷新结果'
+      : buildImdbSyncSuccessMessage(nextStatus.lastResult)
+    if (nextStatus.syncing) {
+      startImdbSyncPolling()
+    }
   } catch (error) {
     console.error(error)
     errorMessage.value = 'IMDb 评分同步失败，请稍后重试或查看后端日志'
   } finally {
     imdbSyncing.value = false
   }
+}
+
+function startImdbSyncPolling() {
+  stopImdbSyncPolling()
+  imdbSyncPollTimer = window.setTimeout(pollImdbSyncStatus, 3000)
+}
+
+async function pollImdbSyncStatus() {
+  const nextStatus = await loadImdbSyncStatus()
+  if (!nextStatus) {
+    startImdbSyncPolling()
+    return
+  }
+
+  if (nextStatus.syncing) {
+    startImdbSyncPolling()
+    return
+  }
+
+  stopImdbSyncPolling()
+  if (nextStatus.lastErrorMessage) {
+    errorMessage.value = `IMDb 评分同步失败：${nextStatus.lastErrorMessage}`
+    return
+  }
+
+  message.value = buildImdbSyncSuccessMessage(nextStatus.lastResult)
+}
+
+function stopImdbSyncPolling() {
+  if (imdbSyncPollTimer !== undefined) {
+    window.clearTimeout(imdbSyncPollTimer)
+    imdbSyncPollTimer = undefined
+  }
+}
+
+function buildImdbSyncSuccessMessage(result?: ImdbRatingsSyncResult | null) {
+  if (!result) {
+    return 'IMDb 评分同步完成'
+  }
+  return `IMDb 评分同步完成：本地有 IMDb ID 的电影 ${result.moviesWithImdbId} 部，匹配 ${result.matchedMovies} 部，更新 ${result.updatedMovies} 部`
 }
 
 function formatDateTime(value?: string | null) {
@@ -180,6 +239,10 @@ function formatNumber(value?: number | null) {
 
 onMounted(() => {
   refreshStatus()
+})
+
+onBeforeUnmount(() => {
+  stopImdbSyncPolling()
 })
 </script>
 
@@ -257,8 +320,8 @@ onMounted(() => {
           <h2>手动同步 IMDb 评分</h2>
           <p>点击后会下载 IMDb 官方评分数据集，并用电影表里的 IMDb ID 更新 IMDb 评分和评分人数。</p>
         </div>
-        <button class="primary-btn" :disabled="imdbSyncing" @click="runImdbSync">
-          {{ imdbSyncing ? '同步中' : '立即同步' }}
+        <button class="primary-btn" :disabled="imdbSyncRunning" @click="runImdbSync">
+          {{ imdbSyncRunning ? '同步中' : '立即同步' }}
         </button>
       </div>
 
@@ -266,6 +329,10 @@ onMounted(() => {
         <div class="status-item">
           <span>上次同步时间</span>
           <strong>{{ formatDateTime(imdbSyncStatus?.lastSyncedAt) }}</strong>
+        </div>
+        <div v-if="imdbSyncStatus?.syncing" class="status-item">
+          <span>当前同步开始</span>
+          <strong>{{ formatDateTime(imdbSyncStatus.currentStartedAt) }}</strong>
         </div>
         <div class="status-item">
           <span>待补 IMDb 评分</span>
