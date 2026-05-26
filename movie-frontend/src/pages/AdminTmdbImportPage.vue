@@ -141,7 +141,34 @@ function formatDateTime(value?: string | null) {
   if (!value) {
     return '暂无'
   }
-  return value.replace('T', ' ').slice(0, 19)
+
+  const date = parseServerDateTimeAsUtc(value)
+  if (Number.isNaN(date.getTime())) {
+    return value.replace('T', ' ').slice(0, 19)
+  }
+
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate())
+  ].join('-') + ' ' + [
+    padDatePart(date.getHours()),
+    padDatePart(date.getMinutes()),
+    padDatePart(date.getSeconds())
+  ].join(':')
+}
+
+function parseServerDateTimeAsUtc(value: string) {
+  const [datePart, timePart = '00:00:00'] = value.split('T')
+  const [year, month, day] = datePart.split('-').map(Number)
+  const [hour = '0', minute = '0', secondText = '0'] = timePart.split(':')
+  const second = Number(secondText.split('.')[0])
+
+  return new Date(Date.UTC(year, month - 1, day, Number(hour), Number(minute), second))
+}
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, '0')
 }
 
 function formatNumber(value?: number | null) {
@@ -180,7 +207,7 @@ onMounted(() => {
         </div>
         <div class="status-item">
           <span>最近更新时间</span>
-          <strong>{{ status?.updatedAt ?? '-' }}</strong>
+          <strong>{{ formatDateTime(status?.updatedAt) }}</strong>
         </div>
       </div>
 
@@ -269,7 +296,7 @@ onMounted(() => {
         </div>
         <div class="status-item">
           <span>完成时间</span>
-          <strong>{{ imdbSyncResult.finishedAt }}</strong>
+          <strong>{{ formatDateTime(imdbSyncResult.finishedAt) }}</strong>
         </div>
       </div>
     </section>
