@@ -56,6 +56,19 @@ public class ImdbRatingsSyncService {
               AND TRIM(imdb_id) <> ''
               AND (imdb_vote_average IS NULL OR imdb_vote_count IS NULL)
             """;
+    private static final String MOVIES_WITH_IMDB_ID_SQL = """
+            SELECT id, imdb_id
+            FROM movie
+            WHERE imdb_id IS NOT NULL
+              AND TRIM(imdb_id) <> ''
+            """;
+    private static final String MOVIES_MISSING_IMDB_RATING_SQL = """
+            SELECT id, imdb_id
+            FROM movie
+            WHERE imdb_id IS NOT NULL
+              AND TRIM(imdb_id) <> ''
+              AND (imdb_vote_average IS NULL OR imdb_vote_count IS NULL)
+            """;
 
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
@@ -81,19 +94,27 @@ public class ImdbRatingsSyncService {
     }
 
     public synchronized ImdbRatingsSyncStatusResponse startSyncRatings() {
+        return startSyncRatings(false);
+    }
+
+    public synchronized ImdbRatingsSyncStatusResponse startSyncMissingRatings() {
+        return startSyncRatings(true);
+    }
+
+    private synchronized ImdbRatingsSyncStatusResponse startSyncRatings(boolean missingOnly) {
         if (!syncing) {
             syncing = true;
             currentStartedAt = LocalDateTime.now();
             lastErrorMessage = null;
-            syncExecutor.submit(this::runSyncJob);
+            syncExecutor.submit(() -> runSyncJob(missingOnly));
         }
 
         return getStatus();
     }
 
-    private void runSyncJob() {
+    private void runSyncJob(boolean missingOnly) {
         try {
-            ImdbRatingsSyncResponse result = syncRatings();
+            ImdbRatingsSyncResponse result = syncRatings(missingOnly);
             lastResult = result;
             lastErrorMessage = null;
         } catch (Exception error) {
@@ -105,14 +126,18 @@ public class ImdbRatingsSyncService {
         }
     }
 
-    private ImdbRatingsSyncResponse syncRatings() {
+    private ImdbRatingsSyncResponse syncRatings(boolean missingOnly) {
         LocalDateTime startedAt = LocalDateTime.now();
         LocalDateTime ratingUpdatedAt = LocalDateTime.now();
-        Map<String, List<Long>> movieIdsByImdbId = loadMovieIdsByImdbId();
+        Map<String, List<Long>> movieIdsByImdbId = loadMovieIdsByImdbId(missingOnly);
         int moviesWithImdbId = movieIdsByImdbId.values().stream().mapToInt(List::size).sum();
         int totalRows = 0;
         int matchedMovies = 0;
         List<Object[]> updateArgs = new ArrayList<>();
+
+        if (moviesWithImdbId == 0) {
+            return buildSyncResponse(startedAt, missingOnly, 0, 0, 0, 0);
+        }
 
         try (InputStream responseBody = openDatasetStream();
              GZIPInputStream gzipInputStream = new GZIPInputStream(responseBody);
@@ -148,6 +173,17 @@ public class ImdbRatingsSyncService {
 
         int updatedMovies = updateMatchedMovies(updateArgs);
 
+        return buildSyncResponse(startedAt, missingOnly, moviesWithImdbId, totalRows, matchedMovies, updatedMovies);
+    }
+
+    private ImdbRatingsSyncResponse buildSyncResponse(
+            LocalDateTime startedAt,
+            boolean missingOnly,
+            int moviesWithImdbId,
+            int totalRows,
+            int matchedMovies,
+            int updatedMovies
+    ) {
         ImdbRatingsSyncResponse response = new ImdbRatingsSyncResponse();
         response.setDatasetUrl(ratingsUrl);
         response.setMoviesWithImdbId(moviesWithImdbId);
@@ -155,6 +191,7 @@ public class ImdbRatingsSyncService {
         response.setMatchedMovies(matchedMovies);
         response.setUpdatedMovies(updatedMovies);
         response.setMissingMovies(moviesWithImdbId - matchedMovies);
+        response.setMissingOnly(missingOnly);
         response.setStartedAt(startedAt);
         response.setFinishedAt(LocalDateTime.now());
         return response;
@@ -174,11 +211,11 @@ public class ImdbRatingsSyncService {
         return response;
     }
 
-    private Map<String, List<Long>> loadMovieIdsByImdbId() {
+    private Map<String, List<Long>> loadMovieIdsByImdbId(boolean missingOnly) {
         Map<String, List<Long>> movieIdsByImdbId = new HashMap<>();
 
         jdbcTemplate.query(
-                "SELECT id, imdb_id FROM movie WHERE imdb_id IS NOT NULL AND TRIM(imdb_id) <> ''",
+                missingOnly ? MOVIES_MISSING_IMDB_RATING_SQL : MOVIES_WITH_IMDB_ID_SQL,
                 resultSet -> {
                     String imdbId = normalizeImdbId(resultSet.getString("imdb_id"));
                     if (!imdbId.isBlank()) {

@@ -13,6 +13,7 @@ public class ImdbRatingsSyncResponse {
     private Integer matchedMovies;
     private Integer updatedMovies;
     private Integer missingMovies;
+    private Boolean missingOnly;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
 }

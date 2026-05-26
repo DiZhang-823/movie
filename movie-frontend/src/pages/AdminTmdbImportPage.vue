@@ -6,6 +6,7 @@ import {
   runTmdbImportBatch,
   setTmdbImportEnabled,
   syncImdbRatings,
+  syncMissingImdbRatings,
   type ImdbRatingsSyncStatus,
   type ImdbRatingsSyncResult,
   type TmdbImportStatus
@@ -130,20 +131,20 @@ async function runBatch() {
   }
 }
 
-async function runImdbSync() {
+async function runImdbSync(missingOnly = false) {
   imdbSyncing.value = true
   imdbSyncResult.value = null
   message.value = ''
   errorMessage.value = ''
 
   try {
-    const nextStatus = await syncImdbRatings()
+    const nextStatus = missingOnly ? await syncMissingImdbRatings() : await syncImdbRatings()
     imdbSyncStatus.value = nextStatus
     if (nextStatus.lastResult) {
       imdbSyncResult.value = nextStatus.lastResult
     }
     message.value = nextStatus.syncing
-      ? 'IMDb 评分同步已开始，页面会自动刷新结果'
+      ? (missingOnly ? '待补 IMDb 评分同步已开始，页面会自动刷新结果' : 'IMDb 评分同步已开始，页面会自动刷新结果')
       : buildImdbSyncSuccessMessage(nextStatus.lastResult)
     if (nextStatus.syncing) {
       startImdbSyncPolling()
@@ -193,7 +194,8 @@ function buildImdbSyncSuccessMessage(result?: ImdbRatingsSyncResult | null) {
   if (!result) {
     return 'IMDb 评分同步完成'
   }
-  return `IMDb 评分同步完成：本地有 IMDb ID 的电影 ${result.moviesWithImdbId} 部，匹配 ${result.matchedMovies} 部，更新 ${result.updatedMovies} 部`
+  const targetText = result.missingOnly ? '本次待补 IMDb 评分的电影' : '本地有 IMDb ID 的电影'
+  return `IMDb 评分同步完成：${targetText} ${result.moviesWithImdbId} 部，匹配 ${result.matchedMovies} 部，更新 ${result.updatedMovies} 部`
 }
 
 function formatDateTime(value?: string | null) {
@@ -320,9 +322,14 @@ onBeforeUnmount(() => {
           <h2>手动同步 IMDb 评分</h2>
           <p>点击后会下载 IMDb 官方评分数据集，并用电影表里的 IMDb ID 更新 IMDb 评分和评分人数。</p>
         </div>
-        <button class="primary-btn" :disabled="imdbSyncRunning" @click="runImdbSync">
-          {{ imdbSyncRunning ? '同步中' : '立即同步' }}
-        </button>
+        <div class="imdb-sync-actions">
+          <button class="secondary-btn" :disabled="imdbSyncRunning" @click="runImdbSync(true)">
+            {{ imdbSyncRunning ? '同步中' : '只同步待补' }}
+          </button>
+          <button class="primary-btn" :disabled="imdbSyncRunning" @click="runImdbSync()">
+            {{ imdbSyncRunning ? '同步中' : '全量同步' }}
+          </button>
+        </div>
       </div>
 
       <div class="imdb-status-row">
@@ -342,7 +349,7 @@ onBeforeUnmount(() => {
 
       <div v-if="imdbSyncResult" class="result-grid">
         <div class="status-item">
-          <span>本地 IMDb ID</span>
+          <span>{{ imdbSyncResult.missingOnly ? '本次待补 IMDb 评分' : '本地 IMDb ID' }}</span>
           <strong>{{ imdbSyncResult.moviesWithImdbId }}</strong>
         </div>
         <div class="status-item">
@@ -459,6 +466,14 @@ p {
   margin-top: 18px;
 }
 
+.imdb-sync-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .form-field {
   display: flex;
   flex-direction: column;
@@ -507,6 +522,12 @@ button:disabled {
   color: #fff;
 }
 
+.secondary-btn {
+  border: 1px solid #cfe0ff;
+  background: #eef5ff;
+  color: #1677ff;
+}
+
 .primary-btn.danger {
   background: #dc2626;
 }
@@ -540,7 +561,8 @@ button:disabled {
 
   .panel-header,
   .actions,
-  .run-form {
+  .run-form,
+  .imdb-sync-actions {
     flex-direction: column;
   }
 
@@ -556,6 +578,7 @@ button:disabled {
 
   .run-form input,
   .count-field input,
+  .imdb-sync-actions,
   button {
     width: 100%;
   }

@@ -22,6 +22,11 @@ public class AdminImdbRatingsController {
         return imdbRatingsSyncService.startSyncRatings();
     }
 
+    @PostMapping("/sync-missing")
+    public ImdbRatingsSyncStatusResponse syncMissing() {
+        return imdbRatingsSyncService.startSyncMissingRatings();
+    }
+
     @GetMapping("/status")
     public ImdbRatingsSyncStatusResponse status() {
         return imdbRatingsSyncService.getStatus();

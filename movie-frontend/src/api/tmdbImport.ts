@@ -29,6 +29,7 @@ export type ImdbRatingsSyncResult = {
     matchedMovies: number
     updatedMovies: number
     missingMovies: number
+    missingOnly: boolean
     startedAt: string
     finishedAt: string
 }
@@ -100,6 +101,17 @@ export async function syncImdbRatings(): Promise<ImdbRatingsSyncStatus> {
     if (!response.ok) {
         const text = await response.text()
         throw new Error(text || 'Failed to sync IMDb ratings')
+    }
+    return await response.json()
+}
+
+export async function syncMissingImdbRatings(): Promise<ImdbRatingsSyncStatus> {
+    const response = await request('/admin/imdb-ratings/sync-missing', {
+        method: 'POST'
+    })
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Failed to sync missing IMDb ratings')
     }
     return await response.json()
 }
