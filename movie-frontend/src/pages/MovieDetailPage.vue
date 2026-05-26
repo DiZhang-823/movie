@@ -41,6 +41,18 @@ const displayCast = computed(() => {
 const displayDirectors = computed(() => movie.value?.directors ?? [])
 
 const collectionMovies = computed(() => movie.value?.collectionMovies ?? [])
+const collectionExpanded = ref(false)
+const collectionInitialCount = 6
+
+const displayCollectionMovies = computed(() => {
+  if (collectionExpanded.value) {
+    return collectionMovies.value
+  }
+
+  return collectionMovies.value.slice(0, collectionInitialCount)
+})
+
+const hasMoreCollectionMovies = computed(() => collectionMovies.value.length > collectionInitialCount)
 
 const hasMoreCast = computed(() => {
   if (!movie.value?.cast) {
@@ -90,6 +102,7 @@ async function loadMovieDetail() {
 async function loadDetailPage() {
   visibleCastCount.value = 12
   castListMaxHeight.value = 'none'
+  collectionExpanded.value = false
   userMovie.value = null
   showWatchedPanel.value = false
 
@@ -267,6 +280,10 @@ function getPersonSubtitle(person: PersonItem) {
 
 function getCollectionPosterUrl(item: MovieCollectionItem) {
   return item.posterPath ? getImageUrl(item.posterPath, 'w185') : ''
+}
+
+function toggleCollectionExpanded() {
+  collectionExpanded.value = !collectionExpanded.value
 }
 
 async function expandCast() {
@@ -585,7 +602,7 @@ watch(() => route.params.id, () => {
             <div class="collection-strip">
               <div class="collection-track">
                 <RouterLink
-                  v-for="item in collectionMovies"
+                  v-for="item in displayCollectionMovies"
                   :key="item.id"
                   class="collection-card"
                   :to="`/movies/${item.id}`"
@@ -613,6 +630,12 @@ watch(() => route.params.id, () => {
                   </div>
                 </RouterLink>
               </div>
+            </div>
+
+            <div v-if="hasMoreCollectionMovies" class="expand-wrap collection-expand-wrap">
+              <button type="button" class="expand-btn" @click="toggleCollectionExpanded">
+                {{ collectionExpanded ? '收起' : `展开全部 ${collectionMovies.length} 部` }}
+              </button>
             </div>
           </section>
 
@@ -1146,15 +1169,11 @@ watch(() => route.params.id, () => {
 
 .collection-strip {
   padding: 18px 24px 24px;
-  overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 .collection-track {
-  min-width: max-content;
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 360px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
 }
 
@@ -1256,6 +1275,11 @@ watch(() => route.params.id, () => {
   color: #f59e0b;
   font-size: 16px;
   font-weight: 850;
+}
+
+.collection-expand-wrap {
+  margin: 0;
+  padding: 0 24px 24px;
 }
 
 .mobile-directors {
@@ -1926,25 +1950,25 @@ watch(() => route.params.id, () => {
   }
 
   .collection-strip {
-    margin-inline: -18px;
     padding: 14px 18px 18px;
-    scroll-snap-type: x proximity;
   }
 
   .collection-track {
-    grid-auto-columns: min(82vw, 340px);
+    grid-template-columns: 1fr;
     gap: 12px;
-    padding-right: 18px;
   }
 
   .collection-card {
-    scroll-snap-align: start;
     gap: 10px;
   }
 
   .collection-card:hover {
     transform: none;
     box-shadow: none;
+  }
+
+  .collection-expand-wrap {
+    padding: 0 18px 18px;
   }
 
   .mobile-directors {
