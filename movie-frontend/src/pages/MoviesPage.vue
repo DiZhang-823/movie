@@ -718,90 +718,93 @@ onBeforeUnmount(() => {
       <div v-if="isUserLoggedIn" class="filter-row">
         <span class="label">状态：</span>
         <div class="options">
-          <span
-              v-for="item in userMovieStatusOptions"
-              :key="item.value ?? 'all'"
-              class="option"
-              :class="{ active: selectedUserMovieStatus.value === item.value }"
-              @click="handleUserMovieStatusClick(item)"
+          <template
+            v-for="item in userMovieStatusOptions"
+            :key="item.value ?? 'all'"
           >
-            {{ item.name }}
-          </span>
-
-          <div
-            v-if="showUserRatingRange"
-            class="rating-filter-inline"
-            @click.stop
-          >
-            <button
-              type="button"
-              class="rating-filter-trigger"
-              :class="{ active: ratingRangePopoverOpen || hasUserRatingRangeFilter }"
-              @click="toggleRatingRangePopover"
+            <span
+                class="option"
+                :class="{ active: selectedUserMovieStatus.value === item.value }"
+                @click="handleUserMovieStatusClick(item)"
             >
-              <span>我的评分</span>
-              <strong>{{ userRatingRangeLabel }}</strong>
-              <span class="rating-filter-arrow"></span>
-            </button>
+              {{ item.name }}
+            </span>
 
             <div
-              v-if="ratingRangePopoverOpen"
-              class="rating-range-popover"
+              v-if="showUserRatingRange && item.value === 'WATCHED'"
+              class="rating-filter-inline"
+              @click.stop
             >
-              <div class="rating-range-popover-title">我的评分</div>
-              <div class="rating-range-panel">
-                <div
-                  ref="ratingRangeControlRef"
-                  class="rating-range-control"
-                  :style="{
-                    '--range-start': userRatingRangeStart,
-                    '--range-end': userRatingRangeEnd
-                  }"
-                  @pointerdown="startRatingRangeDrag"
-                >
-                  <div class="rating-range-track">
+              <button
+                type="button"
+                class="rating-filter-trigger"
+                :class="{ active: ratingRangePopoverOpen || hasUserRatingRangeFilter }"
+                @click="toggleRatingRangePopover"
+              >
+                <span>我的评分</span>
+                <strong>{{ userRatingRangeLabel }}</strong>
+                <span class="rating-filter-arrow"></span>
+              </button>
+
+              <div
+                v-if="ratingRangePopoverOpen"
+                class="rating-range-popover"
+              >
+                <div class="rating-range-popover-title">我的评分</div>
+                <div class="rating-range-panel">
+                  <div
+                    ref="ratingRangeControlRef"
+                    class="rating-range-control"
+                    :style="{
+                      '--range-start': userRatingRangeStart,
+                      '--range-end': userRatingRangeEnd
+                    }"
+                    @pointerdown="startRatingRangeDrag"
+                  >
+                    <div class="rating-range-track">
+                      <span
+                        v-for="star in 5"
+                        :key="star"
+                        class="rating-range-tick"
+                      ></span>
+                    </div>
+                    <div class="rating-range-active"></div>
+                    <button
+                      type="button"
+                      class="rating-range-handle rating-range-handle-min"
+                      :class="{ dragging: ratingRangeDragState?.handle === 'min' }"
+                      aria-label="最低我的评分"
+                      :aria-valuenow="userRatingMin"
+                      aria-valuemin="1"
+                      aria-valuemax="5"
+                      @pointerdown.stop="startRatingRangeDrag($event, 'min')"
+                      @keydown="handleRatingRangeKeydown('min', $event)"
+                    ></button>
+                    <button
+                      type="button"
+                      class="rating-range-handle rating-range-handle-max"
+                      :class="{ dragging: ratingRangeDragState?.handle === 'max' }"
+                      aria-label="最高我的评分"
+                      :aria-valuenow="userRatingMax"
+                      aria-valuemin="1"
+                      aria-valuemax="5"
+                      @pointerdown.stop="startRatingRangeDrag($event, 'max')"
+                      @keydown="handleRatingRangeKeydown('max', $event)"
+                    ></button>
+                  </div>
+                  <div class="rating-range-labels">
                     <span
                       v-for="star in 5"
                       :key="star"
-                      class="rating-range-tick"
-                    ></span>
+                      :class="{ active: star >= userRatingMin && star <= userRatingMax }"
+                    >
+                      {{ star }}星
+                    </span>
                   </div>
-                  <div class="rating-range-active"></div>
-                  <button
-                    type="button"
-                    class="rating-range-handle rating-range-handle-min"
-                    :class="{ dragging: ratingRangeDragState?.handle === 'min' }"
-                    aria-label="最低我的评分"
-                    :aria-valuenow="userRatingMin"
-                    aria-valuemin="1"
-                    aria-valuemax="5"
-                    @pointerdown.stop="startRatingRangeDrag($event, 'min')"
-                    @keydown="handleRatingRangeKeydown('min', $event)"
-                  ></button>
-                  <button
-                    type="button"
-                    class="rating-range-handle rating-range-handle-max"
-                    :class="{ dragging: ratingRangeDragState?.handle === 'max' }"
-                    aria-label="最高我的评分"
-                    :aria-valuenow="userRatingMax"
-                    aria-valuemin="1"
-                    aria-valuemax="5"
-                    @pointerdown.stop="startRatingRangeDrag($event, 'max')"
-                    @keydown="handleRatingRangeKeydown('max', $event)"
-                  ></button>
-                </div>
-                <div class="rating-range-labels">
-                  <span
-                    v-for="star in 5"
-                    :key="star"
-                    :class="{ active: star >= userRatingMin && star <= userRatingMax }"
-                  >
-                    {{ star }}星
-                  </span>
                 </div>
               </div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
 
