@@ -13,6 +13,7 @@ const biographyRef = ref<HTMLElement | null>(null)
 const isBiographyExpanded = ref(false)
 const canToggleBiography = ref(false)
 let biographyResizeTimer: ReturnType<typeof setTimeout> | undefined
+const mobileBiographyCollapsedHeight = 280
 
 const roleOptions = [
   { key: 'ALL', label: '全部' },
@@ -148,7 +149,7 @@ async function updateBiographyToggle() {
     await nextTick()
   }
 
-  canToggleBiography.value = biographyElement.scrollHeight > biographyElement.clientHeight + 2
+  canToggleBiography.value = biographyElement.scrollHeight > mobileBiographyCollapsedHeight + 2
 
   if (wasExpanded && canToggleBiography.value) {
     isBiographyExpanded.value = true
@@ -989,12 +990,13 @@ onBeforeUnmount(() => {
   }
 
   .biography-wrap.collapsible:not(.expanded) {
-    padding-bottom: 2px;
+    max-height: 280px;
+    overflow: hidden;
+    padding-bottom: 34px;
   }
 
   .biography-wrap.collapsible:not(.expanded) .biography {
-    max-height: 150px;
-    overflow: hidden;
+    max-height: none;
   }
 
   .biography-wrap.collapsible:not(.expanded)::after {
@@ -1002,14 +1004,35 @@ onBeforeUnmount(() => {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 34px;
-    height: 54px;
+    bottom: 0;
+    height: 88px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 82%);
     pointer-events: none;
   }
 
   .biography-toggle {
     display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    min-width: 46px;
+    height: 28px;
+    margin-top: 12px;
+  }
+
+  .biography-wrap.collapsible:not(.expanded) .biography-toggle {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    margin-top: 0;
+    padding-left: 14px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff 28%);
+  }
+
+  .biography-wrap.collapsible.expanded .biography-toggle {
+    display: flex;
+    width: fit-content;
+    margin-left: auto;
   }
 
   .panel-heading {
