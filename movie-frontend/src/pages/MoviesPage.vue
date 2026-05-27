@@ -253,6 +253,10 @@ function clampRating(value: number) {
   return Math.min(5, Math.max(1, value))
 }
 
+function setRatingRangeControlRef(element: unknown) {
+  ratingRangeControlRef.value = element instanceof HTMLElement ? element : null
+}
+
 function getRatingFromPointer(event: PointerEvent) {
   if (!ratingRangeControlRef.value) {
     return userRatingMin.value
@@ -753,7 +757,7 @@ onBeforeUnmount(() => {
                 <div class="rating-range-popover-title">我的评分</div>
                 <div class="rating-range-panel">
                   <div
-                    ref="ratingRangeControlRef"
+                    :ref="setRatingRangeControlRef"
                     class="rating-range-control"
                     :style="{
                       '--range-start': userRatingRangeStart,
