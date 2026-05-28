@@ -30,6 +30,9 @@ public class ImportProgress {
     @Column(nullable = false)
     private Boolean enabled = true;
 
+    @Column(name = "interval_seconds")
+    private Integer intervalSeconds;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

@@ -3,6 +3,7 @@ import { request } from '../utils/request'
 export type TmdbImportStatus = {
     nextTmdbId: number
     enabled: boolean
+    intervalSeconds: number
     updatedAt?: string | null
 }
 
@@ -58,6 +59,17 @@ export async function setTmdbImportEnabled(enabled: boolean): Promise<TmdbImport
     })
     if (!response.ok) {
         throw new Error('Failed to update TMDB import switch')
+    }
+    return await response.json()
+}
+
+export async function setTmdbImportInterval(intervalSeconds: number): Promise<TmdbImportStatus> {
+    const response = await request('/admin/tmdb-import/interval', {
+        method: 'PUT',
+        body: JSON.stringify({ intervalSeconds })
+    })
+    if (!response.ok) {
+        throw new Error('Failed to update TMDB import interval')
     }
     return await response.json()
 }

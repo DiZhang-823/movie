@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Component
 public class TmdbMovieImportScheduler {
 
@@ -19,21 +21,25 @@ public class TmdbMovieImportScheduler {
     private final ImportProgressRepository importProgressRepository;
     private final boolean enabled;
     private final long startId;
+    private final int defaultIntervalSeconds;
 
     public TmdbMovieImportScheduler(
             MovieService movieService,
             ImportProgressRepository importProgressRepository,
             @Value("${movie.tmdb.auto-import.enabled:true}") boolean enabled,
-            @Value("${movie.tmdb.auto-import.start-id:151}") long startId) {
+            @Value("${movie.tmdb.auto-import.start-id:151}") long startId,
+            @Value("${movie.tmdb.auto-import.interval-seconds:0}") int configuredIntervalSeconds,
+            @Value("${movie.tmdb.auto-import.delay-ms:300000}") long configuredDelayMs) {
         this.movieService = movieService;
         this.importProgressRepository = importProgressRepository;
         this.enabled = enabled;
         this.startId = startId;
+        this.defaultIntervalSeconds = resolveDefaultIntervalSeconds(configuredIntervalSeconds, configuredDelayMs);
     }
 
     @Scheduled(
             initialDelayString = "${movie.tmdb.auto-import.initial-delay-ms:3000}",
-            fixedDelayString = "${movie.tmdb.auto-import.delay-ms:5000}"
+            fixedDelay = 1000
     )
     public void importNextMovie() {
         if (!enabled) {
@@ -42,6 +48,9 @@ public class TmdbMovieImportScheduler {
 
         ImportProgress progress = getOrCreateProgress();
         if (!Boolean.TRUE.equals(progress.getEnabled())) {
+            return;
+        }
+        if (!shouldRunNow(progress)) {
             return;
         }
 
@@ -60,13 +69,41 @@ public class TmdbMovieImportScheduler {
     }
 
     private ImportProgress getOrCreateProgress() {
-        return importProgressRepository.findByTaskName(TASK_NAME)
+        ImportProgress progress = importProgressRepository.findByTaskName(TASK_NAME)
                 .orElseGet(() -> {
-                    ImportProgress progress = new ImportProgress();
-                    progress.setTaskName(TASK_NAME);
-                    progress.setNextTmdbId(startId);
-                    progress.setEnabled(true);
-                    return importProgressRepository.save(progress);
+                    ImportProgress newProgress = new ImportProgress();
+                    newProgress.setTaskName(TASK_NAME);
+                    newProgress.setNextTmdbId(startId);
+                    newProgress.setEnabled(true);
+                    newProgress.setIntervalSeconds(defaultIntervalSeconds);
+                    return importProgressRepository.save(newProgress);
                 });
+
+        if (progress.getIntervalSeconds() == null) {
+            progress.setIntervalSeconds(defaultIntervalSeconds);
+            return importProgressRepository.save(progress);
+        }
+
+        return progress;
+    }
+
+    private boolean shouldRunNow(ImportProgress progress) {
+        LocalDateTime updatedAt = progress.getUpdatedAt();
+        if (updatedAt == null) {
+            return true;
+        }
+
+        return !updatedAt.plusSeconds(resolveIntervalSeconds(progress)).isAfter(LocalDateTime.now());
+    }
+
+    private int resolveIntervalSeconds(ImportProgress progress) {
+        return progress.getIntervalSeconds() == null ? defaultIntervalSeconds : progress.getIntervalSeconds();
+    }
+
+    private int resolveDefaultIntervalSeconds(int configuredIntervalSeconds, long configuredDelayMs) {
+        if (configuredIntervalSeconds > 0) {
+            return configuredIntervalSeconds;
+        }
+        return Math.max(1, (int) Math.ceil(configuredDelayMs / 1000.0));
     }
 }

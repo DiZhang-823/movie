@@ -10,5 +10,6 @@ import java.time.LocalDateTime;
 public class TmdbImportStatusResponse {
     private Long nextTmdbId;
     private Boolean enabled;
+    private Integer intervalSeconds;
     private LocalDateTime updatedAt;
 }

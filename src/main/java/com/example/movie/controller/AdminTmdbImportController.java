@@ -2,6 +2,7 @@ package com.example.movie.controller;
 
 import com.example.movie.dto.TmdbImportRunRequest;
 import com.example.movie.dto.TmdbImportRunResponse;
+import com.example.movie.dto.TmdbImportIntervalRequest;
 import com.example.movie.dto.TmdbImportStatusResponse;
 import com.example.movie.dto.TmdbImportSwitchRequest;
 import com.example.movie.service.TmdbImportAdminService;
@@ -32,6 +33,11 @@ public class AdminTmdbImportController {
     @PutMapping("/switch")
     public TmdbImportStatusResponse switchImport(@Valid @RequestBody TmdbImportSwitchRequest request) {
         return tmdbImportAdminService.setEnabled(request.getEnabled());
+    }
+
+    @PutMapping("/interval")
+    public TmdbImportStatusResponse updateInterval(@Valid @RequestBody TmdbImportIntervalRequest request) {
+        return tmdbImportAdminService.setIntervalSeconds(request.getIntervalSeconds());
     }
 
     @PostMapping("/run-once")

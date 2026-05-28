@@ -5,6 +5,7 @@ import {
   fetchTmdbImportStatus,
   runTmdbImportBatch,
   setTmdbImportEnabled,
+  setTmdbImportInterval,
   syncImdbRatings,
   syncMissingImdbRatings,
   type ImdbRatingsSyncStatus,
@@ -15,10 +16,12 @@ import {
 const status = ref<TmdbImportStatus | null>(null)
 const loading = ref(false)
 const switching = ref(false)
+const savingInterval = ref(false)
 const running = ref(false)
 const imdbSyncing = ref(false)
 const tmdbId = ref<number | null>(null)
 const importCount = ref(1)
+const intervalSeconds = ref<number | null>(null)
 const imdbSyncResult = ref<ImdbRatingsSyncResult | null>(null)
 const imdbSyncStatus = ref<ImdbRatingsSyncStatus | null>(null)
 const message = ref('')
@@ -43,6 +46,7 @@ async function loadStatus() {
     if (tmdbId.value === null) {
       tmdbId.value = status.value.nextTmdbId
     }
+    intervalSeconds.value = status.value.intervalSeconds
   } catch (error) {
     console.error(error)
     errorMessage.value = '读取导入状态失败'
@@ -92,6 +96,32 @@ async function toggleImport() {
     errorMessage.value = '更新开关失败'
   } finally {
     switching.value = false
+  }
+}
+
+async function saveInterval() {
+  if (!Number.isInteger(intervalSeconds.value) || intervalSeconds.value === null || intervalSeconds.value < 1) {
+    errorMessage.value = '请输入有效的间隔时长'
+    return
+  }
+  if (intervalSeconds.value > 86400) {
+    errorMessage.value = '间隔时长不能超过 86400 秒'
+    return
+  }
+
+  savingInterval.value = true
+  message.value = ''
+  errorMessage.value = ''
+
+  try {
+    status.value = await setTmdbImportInterval(intervalSeconds.value)
+    intervalSeconds.value = status.value.intervalSeconds
+    message.value = `定时任务间隔已更新为 ${status.value.intervalSeconds} 秒`
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '更新间隔时长失败'
+  } finally {
+    savingInterval.value = false
   }
 }
 
@@ -271,6 +301,10 @@ onBeforeUnmount(() => {
           <strong>{{ status?.nextTmdbId ?? '-' }}</strong>
         </div>
         <div class="status-item">
+          <span>导入间隔</span>
+          <strong>{{ status?.intervalSeconds ?? '-' }} 秒</strong>
+        </div>
+        <div class="status-item">
           <span>最近更新时间</span>
           <strong>{{ formatDateTime(status?.updatedAt) }}</strong>
         </div>
@@ -284,6 +318,19 @@ onBeforeUnmount(() => {
           @click="toggleImport"
         >
           {{ status?.enabled ? '暂停定时任务' : '开启定时任务' }}
+        </button>
+        <label class="form-field interval-field">
+          <span>间隔时长（秒）</span>
+          <input
+            v-model.number="intervalSeconds"
+            type="number"
+            min="1"
+            max="86400"
+            placeholder="例如 10"
+          />
+        </label>
+        <button class="secondary-btn" :disabled="!status || savingInterval" @click="saveInterval">
+          {{ savingInterval ? '保存中' : '保存间隔' }}
         </button>
       </div>
     </section>
@@ -420,7 +467,13 @@ p {
   color: #6b7280;
 }
 
-.status-grid,
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
 .result-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -485,6 +538,7 @@ p {
   font-size: 13px;
 }
 
+.actions input,
 .run-form input {
   width: 220px;
   height: 38px;
@@ -494,12 +548,17 @@ p {
   outline: none;
 }
 
+.actions input:focus,
 .run-form input:focus {
   border-color: #1677ff;
 }
 
 .count-field input {
   width: 130px;
+}
+
+.interval-field input {
+  width: 140px;
 }
 
 button {
@@ -577,6 +636,8 @@ button:disabled {
   }
 
   .run-form input,
+  .actions input,
+  .interval-field input,
   .count-field input,
   .imdb-sync-actions,
   button {

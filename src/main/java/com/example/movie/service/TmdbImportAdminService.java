@@ -20,14 +20,18 @@ public class TmdbImportAdminService {
     private final MovieService movieService;
     private final ImportProgressRepository importProgressRepository;
     private final long startId;
+    private final int defaultIntervalSeconds;
 
     public TmdbImportAdminService(
             MovieService movieService,
             ImportProgressRepository importProgressRepository,
-            @Value("${movie.tmdb.auto-import.start-id:151}") long startId) {
+            @Value("${movie.tmdb.auto-import.start-id:151}") long startId,
+            @Value("${movie.tmdb.auto-import.interval-seconds:0}") int configuredIntervalSeconds,
+            @Value("${movie.tmdb.auto-import.delay-ms:300000}") long configuredDelayMs) {
         this.movieService = movieService;
         this.importProgressRepository = importProgressRepository;
         this.startId = startId;
+        this.defaultIntervalSeconds = resolveDefaultIntervalSeconds(configuredIntervalSeconds, configuredDelayMs);
     }
 
     @Transactional
@@ -40,6 +44,13 @@ public class TmdbImportAdminService {
     public TmdbImportStatusResponse setEnabled(Boolean enabled) {
         ImportProgress progress = getOrCreateProgress();
         progress.setEnabled(enabled);
+        return toResponse(importProgressRepository.save(progress));
+    }
+
+    @Transactional
+    public TmdbImportStatusResponse setIntervalSeconds(Integer intervalSeconds) {
+        ImportProgress progress = getOrCreateProgress();
+        progress.setIntervalSeconds(intervalSeconds);
         return toResponse(importProgressRepository.save(progress));
     }
 
@@ -87,21 +98,41 @@ public class TmdbImportAdminService {
     }
 
     private ImportProgress getOrCreateProgress() {
-        return importProgressRepository.findByTaskName(TASK_NAME)
+        ImportProgress progress = importProgressRepository.findByTaskName(TASK_NAME)
                 .orElseGet(() -> {
-                    ImportProgress progress = new ImportProgress();
-                    progress.setTaskName(TASK_NAME);
-                    progress.setNextTmdbId(startId);
-                    progress.setEnabled(true);
-                    return importProgressRepository.save(progress);
+                    ImportProgress newProgress = new ImportProgress();
+                    newProgress.setTaskName(TASK_NAME);
+                    newProgress.setNextTmdbId(startId);
+                    newProgress.setEnabled(true);
+                    newProgress.setIntervalSeconds(defaultIntervalSeconds);
+                    return importProgressRepository.save(newProgress);
                 });
+
+        if (progress.getIntervalSeconds() == null) {
+            progress.setIntervalSeconds(defaultIntervalSeconds);
+            return importProgressRepository.save(progress);
+        }
+
+        return progress;
     }
 
     private TmdbImportStatusResponse toResponse(ImportProgress progress) {
         return new TmdbImportStatusResponse(
                 progress.getNextTmdbId(),
                 Boolean.TRUE.equals(progress.getEnabled()),
+                resolveIntervalSeconds(progress),
                 progress.getUpdatedAt()
         );
+    }
+
+    private int resolveIntervalSeconds(ImportProgress progress) {
+        return progress.getIntervalSeconds() == null ? defaultIntervalSeconds : progress.getIntervalSeconds();
+    }
+
+    private int resolveDefaultIntervalSeconds(int configuredIntervalSeconds, long configuredDelayMs) {
+        if (configuredIntervalSeconds > 0) {
+            return configuredIntervalSeconds;
+        }
+        return Math.max(1, (int) Math.ceil(configuredDelayMs / 1000.0));
     }
 }
