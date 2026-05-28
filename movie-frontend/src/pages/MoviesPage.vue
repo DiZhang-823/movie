@@ -260,6 +260,19 @@ function handleUserMovieStatusClick(status: { value: UserMovieStatusFilter | nul
   resetPageAndLoadMovies()
 }
 
+function handleUserMovieStatusOptionClick(
+  status: { value: UserMovieStatusFilter | null; name: string },
+  event: MouseEvent
+) {
+  if (showUserRatingRange.value && status.value === 'WATCHED') {
+    event.stopPropagation()
+    toggleRatingRangePopover()
+    return
+  }
+
+  handleUserMovieStatusClick(status)
+}
+
 function resetUserRatingRange(shouldLoad = true) {
   userRatingMin.value = 1
   userRatingMax.value = 5
@@ -894,7 +907,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="isUserLoggedIn" class="filter-row">
+      <div v-if="isUserLoggedIn" class="filter-row user-status-filter-row">
         <span class="label">状态：</span>
         <div class="options">
           <template
@@ -902,16 +915,24 @@ onBeforeUnmount(() => {
             :key="item.value ?? 'all'"
           >
             <span
-                class="option"
-                :class="{ active: selectedUserMovieStatus.value === item.value }"
-                @click="handleUserMovieStatusClick(item)"
+              class="option user-status-option"
+              :class="{
+                active: selectedUserMovieStatus.value === item.value,
+                'watched-rating-option': showUserRatingRange && item.value === 'WATCHED'
+              }"
+              @click="handleUserMovieStatusOptionClick(item, $event)"
             >
-              {{ item.name }}
+              <span>{{ item.name }}</span>
+              <template v-if="showUserRatingRange && item.value === 'WATCHED'">
+                <span class="mobile-status-rating-separator">·</span>
+                <strong class="mobile-status-rating-label">{{ userRatingRangeLabel }}</strong>
+                <span class="rating-filter-arrow mobile-status-rating-arrow"></span>
+              </template>
             </span>
 
             <div
               v-if="showUserRatingRange && item.value === 'WATCHED'"
-              class="rating-filter-inline"
+              class="rating-filter-inline user-rating-filter"
               @click.stop
             >
               <button
@@ -1429,6 +1450,12 @@ onBeforeUnmount(() => {
 .rating-filter-trigger strong {
   color: inherit;
   font-weight: 700;
+}
+
+.mobile-status-rating-separator,
+.mobile-status-rating-label,
+.mobile-status-rating-arrow {
+  display: none;
 }
 
 .movie-rating-options {
@@ -2166,6 +2193,48 @@ onBeforeUnmount(() => {
   .filter-row:has(.rating-filter-inline) .options {
     flex-wrap: wrap;
     overflow: visible;
+  }
+
+  .filter-row.user-status-filter-row .options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .user-status-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .watched-rating-option {
+    padding-right: 12px;
+  }
+
+  .mobile-status-rating-separator,
+  .mobile-status-rating-label,
+  .mobile-status-rating-arrow {
+    display: inline-flex;
+  }
+
+  .mobile-status-rating-label {
+    color: inherit;
+    font-weight: 700;
+  }
+
+  .mobile-status-rating-arrow {
+    flex: 0 0 auto;
+    margin-left: 1px;
+  }
+
+  .user-rating-filter {
+    width: 0;
+    height: 0;
+    flex: 0 0 0;
+  }
+
+  .user-rating-filter > .rating-filter-trigger {
+    display: none;
   }
 
   .rating-range-popover {
