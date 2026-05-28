@@ -76,10 +76,16 @@ const selectedUserMovieStatus = ref<{ value: UserMovieStatusFilter | null; name:
 })
 const userRatingMin = ref(1)
 const userRatingMax = ref(5)
+const movieRatingMin = ref(1)
+const movieRatingMax = ref(10)
+const movieRatingLabelMarks = [1, 5, 10]
 const isUserLoggedIn = ref(isLoggedIn())
 const ratingRangeControlRef = ref<HTMLElement | null>(null)
 const ratingRangeDragState = ref<RatingRangeDragState | null>(null)
 const ratingRangePopoverOpen = ref(false)
+const movieRatingRangeControlRef = ref<HTMLElement | null>(null)
+const movieRatingRangeDragState = ref<RatingRangeDragState | null>(null)
+const movieRatingRangePopoverOpen = ref(false)
 
 const movies = ref<MovieItem[]>([])
 const loading = ref(false)
@@ -119,6 +125,17 @@ const userRatingRangeLabel = computed(() => {
 })
 const userRatingRangeStart = computed(() => `${((userRatingMin.value - 1) / 4) * 100}%`)
 const userRatingRangeEnd = computed(() => `${100 - ((userRatingMax.value - 1) / 4) * 100}%`)
+const hasMovieRatingRangeFilter = computed(() => movieRatingMin.value !== 1 || movieRatingMax.value !== 10)
+const movieRatingRangeLabel = computed(() => {
+  if (!hasMovieRatingRangeFilter.value) {
+    return '全部'
+  }
+  return movieRatingMin.value === movieRatingMax.value
+    ? `${movieRatingMin.value}分`
+    : `${movieRatingMin.value}-${movieRatingMax.value}分`
+})
+const movieRatingRangeStart = computed(() => `${((movieRatingMin.value - 1) / 9) * 100}%`)
+const movieRatingRangeEnd = computed(() => `${100 - ((movieRatingMax.value - 1) / 9) * 100}%`)
 const visiblePages = computed(() => {
   const total = totalPages.value
   const current = page.value
@@ -184,6 +201,8 @@ async function loadMovies() {
       userMovieStatus: isUserLoggedIn.value ? selectedUserMovieStatus.value.value ?? undefined : undefined,
       userRatingMin: hasUserRatingRangeFilter.value ? userRatingMin.value : undefined,
       userRatingMax: hasUserRatingRangeFilter.value ? userRatingMax.value : undefined,
+      movieRatingMin: hasMovieRatingRangeFilter.value ? movieRatingMin.value : undefined,
+      movieRatingMax: hasMovieRatingRangeFilter.value ? movieRatingMax.value : undefined,
       page: page.value,
       size: size.value,
       sortBy: selectedSort.value.sortBy,
@@ -358,6 +377,9 @@ function finishRatingRangeDrag() {
 
 function toggleRatingRangePopover() {
   ratingRangePopoverOpen.value = !ratingRangePopoverOpen.value
+  if (ratingRangePopoverOpen.value) {
+    movieRatingRangePopoverOpen.value = false
+  }
 }
 
 function handleRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEvent) {
@@ -375,6 +397,156 @@ function handleRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEven
 
   updateRatingRangeHandle(handle, nextValue)
   if (previousMin !== userRatingMin.value || previousMax !== userRatingMax.value) {
+    resetPageAndLoadMovies()
+  }
+}
+
+function clampMovieRating(value: number) {
+  return Math.min(10, Math.max(1, value))
+}
+
+function getMovieRatingPointPosition(score: number) {
+  return `${((score - 1) / 9) * 100}%`
+}
+
+function getMovieRatingLabelStyle(score: number) {
+  let transform = 'translateX(-50%)'
+  if (score === 1) {
+    transform = 'translateX(0)'
+  } else if (score === 10) {
+    transform = 'translateX(-100%)'
+  }
+
+  return {
+    left: getMovieRatingPointPosition(score),
+    transform
+  }
+}
+
+function setMovieRatingRangeControlRef(element: unknown) {
+  movieRatingRangeControlRef.value = element instanceof HTMLElement ? element : null
+}
+
+function getMovieRatingFromPointer(event: PointerEvent) {
+  if (!movieRatingRangeControlRef.value) {
+    return movieRatingMin.value
+  }
+
+  const rect = movieRatingRangeControlRef.value.getBoundingClientRect()
+  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+  return clampMovieRating(Math.round(ratio * 9) + 1)
+}
+
+function chooseMovieRatingRangeHandle(value: number): RatingRangeHandle | null {
+  if (movieRatingMin.value === movieRatingMax.value) {
+    if (value < movieRatingMin.value) {
+      return 'min'
+    }
+    if (value > movieRatingMax.value) {
+      return 'max'
+    }
+    return null
+  }
+
+  const minDistance = Math.abs(value - movieRatingMin.value)
+  const maxDistance = Math.abs(value - movieRatingMax.value)
+  if (minDistance < maxDistance) {
+    return 'min'
+  }
+  if (maxDistance < minDistance) {
+    return 'max'
+  }
+  return value < movieRatingMin.value ? 'min' : 'max'
+}
+
+function updateMovieRatingRangeHandle(handle: RatingRangeHandle, value: number) {
+  const rating = clampMovieRating(value)
+  if (handle === 'min') {
+    movieRatingMin.value = Math.min(rating, movieRatingMax.value)
+  } else {
+    movieRatingMax.value = Math.max(rating, movieRatingMin.value)
+  }
+}
+
+function startMovieRatingRangeDrag(event: PointerEvent, requestedHandle?: RatingRangeHandle) {
+  event.preventDefault()
+
+  const pointedRating = getMovieRatingFromPointer(event)
+  const handlesOverlap = movieRatingMin.value === movieRatingMax.value
+  const handle = requestedHandle && !handlesOverlap
+    ? requestedHandle
+    : chooseMovieRatingRangeHandle(pointedRating)
+
+  movieRatingRangeDragState.value = {
+    handle,
+    startX: event.clientX,
+    startMin: movieRatingMin.value,
+    startMax: movieRatingMax.value
+  }
+
+  if (handle) {
+    updateMovieRatingRangeHandle(handle, pointedRating)
+  }
+
+  window.addEventListener('pointermove', handleMovieRatingRangePointerMove)
+  window.addEventListener('pointerup', finishMovieRatingRangeDrag)
+}
+
+function handleMovieRatingRangePointerMove(event: PointerEvent) {
+  const dragState = movieRatingRangeDragState.value
+  if (!dragState) {
+    return
+  }
+
+  let handle = dragState.handle
+  if (!handle) {
+    const movement = event.clientX - dragState.startX
+    if (Math.abs(movement) < 2) {
+      return
+    }
+    handle = movement < 0 ? 'min' : 'max'
+    dragState.handle = handle
+  }
+
+  updateMovieRatingRangeHandle(handle, getMovieRatingFromPointer(event))
+}
+
+function finishMovieRatingRangeDrag() {
+  const dragState = movieRatingRangeDragState.value
+  movieRatingRangeDragState.value = null
+  window.removeEventListener('pointermove', handleMovieRatingRangePointerMove)
+  window.removeEventListener('pointerup', finishMovieRatingRangeDrag)
+
+  if (
+    dragState &&
+    (dragState.startMin !== movieRatingMin.value || dragState.startMax !== movieRatingMax.value)
+  ) {
+    resetPageAndLoadMovies()
+  }
+}
+
+function toggleMovieRatingRangePopover() {
+  movieRatingRangePopoverOpen.value = !movieRatingRangePopoverOpen.value
+  if (movieRatingRangePopoverOpen.value) {
+    ratingRangePopoverOpen.value = false
+  }
+}
+
+function handleMovieRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEvent) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowDown' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp') {
+    return
+  }
+
+  event.preventDefault()
+  const delta = event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 1
+  const nextValue = handle === 'min'
+    ? movieRatingMin.value + delta
+    : movieRatingMax.value + delta
+  const previousMin = movieRatingMin.value
+  const previousMax = movieRatingMax.value
+
+  updateMovieRatingRangeHandle(handle, nextValue)
+  if (previousMin !== movieRatingMin.value || previousMax !== movieRatingMax.value) {
     resetPageAndLoadMovies()
   }
 }
@@ -552,6 +724,7 @@ function closeActionPanels() {
   watchedEditorMovieId.value = null
   hoveredWatchedRating.value = null
   ratingRangePopoverOpen.value = false
+  movieRatingRangePopoverOpen.value = false
 }
 
 function toggleActionMenu(movieId: number) {
@@ -645,6 +818,8 @@ onBeforeUnmount(() => {
   document.removeEventListener('click', closeActionPanels)
   window.removeEventListener('pointermove', handleRatingRangePointerMove)
   window.removeEventListener('pointerup', finishRatingRangeDrag)
+  window.removeEventListener('pointermove', handleMovieRatingRangePointerMove)
+  window.removeEventListener('pointerup', finishMovieRatingRangeDrag)
 })
 </script>
 
@@ -827,6 +1002,83 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <div class="filter-row movie-rating-filter-row">
+        <span class="label">电影评分：</span>
+        <div class="options movie-rating-options">
+          <div class="rating-filter-inline movie-rating-filter" @click.stop>
+            <button
+              type="button"
+              class="rating-filter-trigger"
+              :class="{ active: movieRatingRangePopoverOpen || hasMovieRatingRangeFilter }"
+              @click="toggleMovieRatingRangePopover"
+            >
+              <strong>{{ movieRatingRangeLabel }}</strong>
+              <span class="rating-filter-arrow"></span>
+            </button>
+
+            <div
+              v-if="movieRatingRangePopoverOpen"
+              class="rating-range-popover"
+            >
+              <div class="rating-range-popover-title">电影评分</div>
+              <div class="rating-range-panel">
+                <div
+                  :ref="setMovieRatingRangeControlRef"
+                  class="rating-range-control"
+                  :style="{
+                    '--range-start': movieRatingRangeStart,
+                    '--range-end': movieRatingRangeEnd
+                  }"
+                  @pointerdown="startMovieRatingRangeDrag"
+                >
+                  <div class="rating-range-track">
+                    <span
+                      v-for="score in 10"
+                      :key="score"
+                      class="rating-range-tick"
+                      :style="{ left: getMovieRatingPointPosition(score) }"
+                    ></span>
+                  </div>
+                  <div class="rating-range-active"></div>
+                  <button
+                    type="button"
+                    class="rating-range-handle rating-range-handle-min"
+                    :class="{ dragging: movieRatingRangeDragState?.handle === 'min' }"
+                    aria-label="最低电影评分"
+                    :aria-valuenow="movieRatingMin"
+                    aria-valuemin="1"
+                    aria-valuemax="10"
+                    @pointerdown.stop="startMovieRatingRangeDrag($event, 'min')"
+                    @keydown="handleMovieRatingRangeKeydown('min', $event)"
+                  ></button>
+                  <button
+                    type="button"
+                    class="rating-range-handle rating-range-handle-max"
+                    :class="{ dragging: movieRatingRangeDragState?.handle === 'max' }"
+                    aria-label="最高电影评分"
+                    :aria-valuenow="movieRatingMax"
+                    aria-valuemin="1"
+                    aria-valuemax="10"
+                    @pointerdown.stop="startMovieRatingRangeDrag($event, 'max')"
+                    @keydown="handleMovieRatingRangeKeydown('max', $event)"
+                  ></button>
+                </div>
+                <div class="rating-range-labels">
+                  <span
+                    v-for="score in movieRatingLabelMarks"
+                    :key="score"
+                    :style="getMovieRatingLabelStyle(score)"
+                    :class="{ active: score >= movieRatingMin && score <= movieRatingMax }"
+                  >
+                    {{ score }}分
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="filter-row search-filter-row">
         <span class="label">搜索：</span>
         <div class="options search-options">
@@ -847,6 +1099,7 @@ onBeforeUnmount(() => {
       <span v-if="selectedCategory.name !== '全部'">｜当前类型：{{ selectedCategory.name }}</span>
       <span v-if="selectedYear !== null">｜当前年份：{{ selectedYear }}</span>
       <span v-if="selectedRegion.name !== '全部'">｜当前地区：{{ selectedRegion.name }}</span>
+      <span v-if="hasMovieRatingRangeFilter">｜当前电影评分：{{ movieRatingRangeLabel }}</span>
       <span v-if="selectedSort.name !== '默认'">｜当前排序：{{ selectedSort.name }}
 </span>
     </div>
@@ -1171,6 +1424,16 @@ onBeforeUnmount(() => {
 .rating-filter-trigger strong {
   color: inherit;
   font-weight: 700;
+}
+
+.movie-rating-options {
+  overflow: visible;
+}
+
+.movie-rating-filter .rating-filter-trigger {
+  min-width: 72px;
+  justify-content: center;
+  background: #f3f4f6;
 }
 
 .rating-filter-arrow {

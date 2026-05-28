@@ -37,6 +37,8 @@ export interface GetMoviesParams {
     userMovieStatus?: 'DEFAULT' | 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
     userRatingMin?: number
     userRatingMax?: number
+    movieRatingMin?: number
+    movieRatingMax?: number
     page?: number
     size?: number
     sortBy?: string
@@ -121,6 +123,14 @@ export async function getMovies(params: GetMoviesParams): Promise<MoviePageRespo
 
     if (params.userRatingMax !== undefined) {
         searchParams.set('userRatingMax', String(params.userRatingMax))
+    }
+
+    if (params.movieRatingMin !== undefined) {
+        searchParams.set('movieRatingMin', String(params.movieRatingMin))
+    }
+
+    if (params.movieRatingMax !== undefined) {
+        searchParams.set('movieRatingMax', String(params.movieRatingMax))
     }
 
     searchParams.set('page', String(params.page ?? 0))

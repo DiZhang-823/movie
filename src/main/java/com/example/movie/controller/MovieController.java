@@ -50,6 +50,8 @@ public class MovieController {
             @RequestParam(required = false) UserMovieStatusFilter userMovieStatus,
             @RequestParam(required = false) Integer userRatingMin,
             @RequestParam(required = false) Integer userRatingMax,
+            @RequestParam(required = false) Integer movieRatingMin,
+            @RequestParam(required = false) Integer movieRatingMax,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(defaultValue = "ID") String sortBy,
@@ -80,6 +82,8 @@ public class MovieController {
         movieQuery.setUserMovieStatus(userMovieStatus);
         movieQuery.setUserRatingMin(userRatingMin);
         movieQuery.setUserRatingMax(userRatingMax);
+        movieQuery.setMovieRatingMin(movieRatingMin);
+        movieQuery.setMovieRatingMax(movieRatingMax);
         return ResponseEntity.ok(movieService.getMovies(movieQuery, currentUserId, page, size, sortBy, direction));
     }
 

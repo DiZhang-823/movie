@@ -19,4 +19,8 @@ public class MovieQuery {
     private Integer userRatingMin;
 
     private Integer userRatingMax;
+
+    private Integer movieRatingMin;
+
+    private Integer movieRatingMax;
 }

@@ -292,6 +292,12 @@ public class MovieService {
         if (movieQuery.getRegionCode() != null && !movieQuery.getRegionCode().isBlank()) {
             spec = spec.and(MovieSpecifications.hasRegion(movieQuery.getRegionCode()));
         }
+        if (movieQuery.getMovieRatingMin() != null || movieQuery.getMovieRatingMax() != null) {
+            spec = spec.and(MovieSpecifications.hasDisplayVoteAverageBetween(
+                    movieQuery.getMovieRatingMin(),
+                    movieQuery.getMovieRatingMax()
+            ));
+        }
         if (movieQuery.getUserMovieStatus() != null && currentUserId != null) {
             if (movieQuery.getUserMovieStatus() == UserMovieStatusFilter.DEFAULT) {
                 spec = spec.and(MovieSpecifications.doesNotHaveUserMovieStatus(

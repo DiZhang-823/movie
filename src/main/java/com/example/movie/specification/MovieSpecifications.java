@@ -130,6 +130,29 @@ public class MovieSpecifications {
         };
     }
 
+    public static Specification<Movie> hasDisplayVoteAverageBetween(Integer minRating, Integer maxRating) {
+        return (root, query, cb) -> {
+            Expression<BigDecimal> displayVoteAverage = cb.coalesce(
+                    root.get("imdbVoteAverage"),
+                    root.get("voteAverage")
+            );
+
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.or(
+                    cb.isNotNull(root.get("imdbVoteAverage")),
+                    cb.isNotNull(root.get("voteAverage"))
+            ));
+            if (minRating != null) {
+                predicates.add(cb.greaterThanOrEqualTo(displayVoteAverage, BigDecimal.valueOf(minRating)));
+            }
+            if (maxRating != null) {
+                predicates.add(cb.lessThanOrEqualTo(displayVoteAverage, BigDecimal.valueOf(maxRating)));
+            }
+
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+    }
+
     public static Specification<Movie> hasRegion(String regionCode) {
         return (root, query, cb) -> {
             assert query != null;
