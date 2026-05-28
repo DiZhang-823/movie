@@ -1024,7 +1024,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="filter-row movie-rating-filter-row">
-        <span class="label">电影评分：</span>
+        <span class="label">评分：</span>
         <div class="options movie-rating-options">
           <div class="rating-filter-inline movie-rating-filter" @click.stop>
             <button
@@ -1041,7 +1041,7 @@ onBeforeUnmount(() => {
               v-if="movieRatingRangePopoverOpen"
               class="rating-range-popover"
             >
-              <div class="rating-range-popover-title">电影评分</div>
+              <div class="rating-range-popover-title">评分</div>
               <div class="rating-range-panel">
                 <div
                   :ref="setMovieRatingRangeControlRef"
@@ -1065,7 +1065,7 @@ onBeforeUnmount(() => {
                     type="button"
                     class="rating-range-handle rating-range-handle-min"
                     :class="{ dragging: movieRatingRangeDragState?.handle === 'min' }"
-                    aria-label="最低电影评分"
+                    aria-label="最低评分"
                     :aria-valuenow="movieRatingMin"
                     aria-valuemin="1"
                     aria-valuemax="10"
@@ -1076,7 +1076,7 @@ onBeforeUnmount(() => {
                     type="button"
                     class="rating-range-handle rating-range-handle-max"
                     :class="{ dragging: movieRatingRangeDragState?.handle === 'max' }"
-                    aria-label="最高电影评分"
+                    aria-label="最高评分"
                     :aria-valuenow="movieRatingMax"
                     aria-valuemin="1"
                     aria-valuemax="10"
@@ -1120,7 +1120,7 @@ onBeforeUnmount(() => {
       <span v-if="selectedCategory.name !== '全部'">｜当前类型：{{ selectedCategory.name }}</span>
       <span v-if="selectedYear !== null">｜当前年份：{{ selectedYear }}</span>
       <span v-if="selectedRegion.name !== '全部'">｜当前地区：{{ selectedRegion.name }}</span>
-      <span v-if="hasMovieRatingRangeFilter">｜当前电影评分：{{ movieRatingRangeLabel }}</span>
+      <span v-if="hasMovieRatingRangeFilter">｜当前评分：{{ movieRatingRangeLabel }}</span>
       <span v-if="selectedSort.name !== '默认'">｜当前排序：{{ selectedSort.name }}
 </span>
     </div>
