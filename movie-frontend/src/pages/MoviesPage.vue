@@ -2237,6 +2237,23 @@ onBeforeUnmount(() => {
     display: none;
   }
 
+  .movie-rating-filter-row {
+    position: relative;
+  }
+
+  .movie-rating-filter {
+    position: static;
+  }
+
+  .movie-rating-filter .rating-range-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    width: auto;
+    transform: none;
+  }
+
   .rating-range-popover {
     position: fixed;
     top: 50%;
