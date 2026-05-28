@@ -1305,6 +1305,11 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  margin-bottom: 6px;
+}
+
+.filter-row:last-child {
+  margin-bottom: 0;
 }
 
 .label {
