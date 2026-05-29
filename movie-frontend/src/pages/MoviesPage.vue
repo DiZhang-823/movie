@@ -1106,7 +1106,7 @@ onBeforeUnmount(() => {
         <div class="options search-options">
           <input
           v-model="keyword"
-          type="text"
+          type="search"
           class="title-search-input"
           placeholder="请输入电影标题"
           @input="handleKeywordInput"

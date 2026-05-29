@@ -74,6 +74,7 @@ const size = ref(20)
 const totalPages = ref(0)
 const totalElements = ref(0)
 const savingId = ref<number | null>(null)
+const activeActionSeasonId = ref<number | null>(null)
 const jumpPage = ref('')
 
 let searchTimer: number | undefined
@@ -90,6 +91,11 @@ const visiblePages = computed(() => {
   if (current >= total - 4) return [0, '...', total - 5, total - 4, total - 3, total - 2, total - 1]
   return [0, '...', current - 1, current, current + 1, '...', total - 1]
 })
+const recentYears = computed(() => years.value.slice(0, 10))
+const olderYears = computed(() => years.value.slice(10))
+const isOlderYearSelected = computed(() =>
+  selectedYear.value !== null && !recentYears.value.includes(selectedYear.value)
+)
 const hasRatingRangeFilter = computed(() => ratingMin.value !== 0 || ratingMax.value !== 10)
 const ratingRangeLabel = computed(() => {
   if (!hasRatingRangeFilter.value) {
@@ -146,6 +152,21 @@ async function loadTvSeasons() {
 function resetPageAndLoad() {
   page.value = 0
   void loadTvSeasons()
+}
+
+function handleYearClick(year: number | null) {
+  selectedYear.value = year
+  resetPageAndLoad()
+}
+
+function handleOlderYearChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (!value) {
+    return
+  }
+
+  selectedYear.value = Number(value)
+  resetPageAndLoad()
 }
 
 function clampRating(value: number) {
@@ -309,6 +330,18 @@ function getStatusText(status: UserStatus | null) {
   return ''
 }
 
+function getStatusClass(status: UserStatus | null) {
+  return status ? `status-${status.toLowerCase().replaceAll('_', '-')}` : ''
+}
+
+function closeActionMenu() {
+  activeActionSeasonId.value = null
+}
+
+function toggleActionMenu(seasonId: number) {
+  activeActionSeasonId.value = activeActionSeasonId.value === seasonId ? null : seasonId
+}
+
 async function markSeason(item: TvSeasonItem, status: UserStatus) {
   const token = getToken()
   if (!token) {
@@ -318,6 +351,7 @@ async function markSeason(item: TvSeasonItem, status: UserStatus) {
   savingId.value = item.id
   try {
     await saveUserTvSeason(item.id, { status, watchedDate: status === 'WATCHED' ? new Date().toISOString().slice(0, 10) : undefined }, token)
+    closeActionMenu()
     await loadTvSeasons()
   } finally {
     savingId.value = null
@@ -343,12 +377,15 @@ watch(keyword, () => {
 })
 
 onMounted(async () => {
+  document.addEventListener('click', closeActionMenu)
+  isUserLoggedIn.value = isLoggedIn()
   initYears()
   await loadGenres()
   await loadTvSeasons()
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('click', closeActionMenu)
   window.removeEventListener('pointermove', handleRatingRangePointerMove)
   window.removeEventListener('pointerup', finishRatingRangeDrag)
 })
@@ -389,11 +426,25 @@ onBeforeUnmount(() => {
 
       <div class="filter-row">
         <span class="label">年份：</span>
-        <div class="options">
-          <button class="option" :class="{ active: selectedYear === null }" @click="selectedYear = null; resetPageAndLoad()">全部</button>
-          <select v-model="selectedYear" class="select-control" @change="resetPageAndLoad">
-            <option :value="null">选择年份</option>
-            <option v-for="year in years" :key="year" :value="year">{{ year }}</option>
+        <div class="options year-options">
+          <button class="option" :class="{ active: selectedYear === null }" @click="handleYearClick(null)">全部</button>
+          <button
+            v-for="year in recentYears"
+            :key="year"
+            class="option year-number-option"
+            :class="{ active: selectedYear === year }"
+            @click="handleYearClick(year)"
+          >
+            {{ year }}
+          </button>
+          <select
+            class="older-year-select"
+            :class="{ active: isOlderYearSelected }"
+            :value="isOlderYearSelected ? selectedYear : ''"
+            @change="handleOlderYearChange"
+          >
+            <option value="">更早</option>
+            <option v-for="year in olderYears" :key="year" :value="year">{{ year }}</option>
           </select>
         </div>
       </div>
@@ -413,10 +464,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="filter-row">
+      <div class="filter-row movie-rating-filter-row">
         <span class="label">评分：</span>
-        <div class="options compact-options">
-          <div class="rating-filter-inline rating-filter" @click.stop>
+        <div class="options movie-rating-options">
+          <div class="rating-filter-inline movie-rating-filter" @click.stop>
             <button
               type="button"
               class="rating-filter-trigger"
@@ -484,9 +535,6 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <input v-model.number="ratingMin" class="number-input" type="number" min="1" max="10" placeholder="最低" @change="resetPageAndLoad" />
-          <span class="range-separator">-</span>
-          <input v-model.number="ratingMax" class="number-input" type="number" min="1" max="10" placeholder="最高" @change="resetPageAndLoad" />
           <template v-if="selectedStatus.value === 'WATCHED' && isUserLoggedIn">
             <span class="sub-label">我的评分</span>
             <input v-model.number="userRatingMin" class="number-input" type="number" min="1" max="5" placeholder="最低" @change="resetPageAndLoad" />
@@ -524,12 +572,67 @@ onBeforeUnmount(() => {
     <div v-else-if="errorMessage" class="status error">{{ errorMessage }}</div>
 
     <div v-else class="season-grid">
-      <article v-for="item in tvSeasons" :key="item.id" class="season-card">
-        <RouterLink class="poster-link" :to="`/tv-seasons/${item.id}`">
-          <div class="poster-wrap">
-            <img v-if="item.posterPath" :src="getPosterUrl(item.posterPath)" :alt="item.title" />
-            <div v-else class="poster-placeholder">{{ item.title.slice(0, 1) }}</div>
-            <div v-if="item.userTvSeasonStatus" class="status-ribbon">{{ getStatusText(item.userTvSeasonStatus) }}</div>
+      <article
+        v-for="item in tvSeasons"
+        :key="item.id"
+        class="season-card"
+        :class="{ actionOpen: activeActionSeasonId === item.id }"
+      >
+        <div class="poster-shell">
+          <RouterLink class="poster-link" :to="`/tv-seasons/${item.id}`">
+            <div class="poster-wrap">
+              <img v-if="item.posterPath" :src="getPosterUrl(item.posterPath)" :alt="item.title" />
+              <div v-else class="poster-placeholder">{{ item.title.slice(0, 1) }}</div>
+              <div class="episode-badge">{{ item.episodeCount ?? '-' }} 集</div>
+              <div
+                v-if="item.userTvSeasonStatus"
+                class="status-ribbon"
+                :class="getStatusClass(item.userTvSeasonStatus)"
+              >
+                {{ getStatusText(item.userTvSeasonStatus) }}
+              </div>
+            </div>
+          </RouterLink>
+
+          <button
+            v-if="isUserLoggedIn"
+            type="button"
+            class="poster-action-button"
+            :class="{ active: activeActionSeasonId === item.id }"
+            aria-label="标记剧集"
+            @click.stop="toggleActionMenu(item.id)"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+
+          <div
+            v-if="activeActionSeasonId === item.id"
+            class="season-action-menu"
+            @click.stop
+          >
+            <button type="button" :disabled="savingId === item.id" @click="markSeason(item, 'WANT_TO_WATCH')">
+              <span class="action-icon">+</span>
+              想看
+            </button>
+            <button type="button" :disabled="savingId === item.id" @click="markSeason(item, 'WATCHED')">
+              <span class="action-icon">✓</span>
+              看过
+            </button>
+            <button type="button" :disabled="savingId === item.id" @click="markSeason(item, 'NOT_INTERESTED')">
+              <span class="action-icon">-</span>
+              不想看
+            </button>
+          </div>
+        </div>
+
+        <RouterLink class="season-info-link" :to="`/tv-seasons/${item.id}`">
+          <div class="season-meta">
+            <div class="season-title">
+              {{ item.title }}<span v-if="item.year"> ({{ item.year }})</span>
+            </div>
+            <div class="season-rating">{{ formatScore(getDisplayVoteAverage(item)) }}</div>
           </div>
         </RouterLink>
 
@@ -654,6 +757,40 @@ onBeforeUnmount(() => {
   padding: 0 10px;
 }
 
+.year-number-option {
+  width: 52px;
+  min-width: 52px;
+  flex: 0 0 52px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.older-year-select {
+  height: 28px;
+  padding: 0 28px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: #f3f4f6;
+  color: #111827;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.older-year-select:hover {
+  color: #1677ff;
+}
+
+.older-year-select.active {
+  border-color: #1677ff;
+  background: #1677ff;
+  color: #fff;
+}
+
 .number-input {
   width: 74px;
   padding: 0 8px;
@@ -684,12 +821,12 @@ onBeforeUnmount(() => {
 }
 
 .rating-filter-trigger {
-  height: 30px;
+  height: 28px;
   min-width: 72px;
   border: 1px solid transparent;
   border-radius: 4px;
   padding: 0 10px;
-  background: #f3f4f6;
+  background: transparent;
   color: #111827;
   cursor: pointer;
   display: inline-flex;
@@ -710,6 +847,16 @@ onBeforeUnmount(() => {
 .rating-filter-trigger strong {
   color: inherit;
   font-weight: 700;
+}
+
+.movie-rating-options {
+  overflow: visible;
+}
+
+.movie-rating-filter .rating-filter-trigger {
+  min-width: 72px;
+  justify-content: center;
+  background: #f3f4f6;
 }
 
 .rating-filter-arrow {
@@ -880,10 +1027,26 @@ onBeforeUnmount(() => {
 
 .season-card {
   min-width: 0;
+  position: relative;
+  transition: transform 0.2s ease;
+}
+
+.season-card:hover {
+  transform: translateY(-4px);
+}
+
+.season-card.actionOpen {
+  z-index: 20;
+}
+
+.poster-shell {
+  position: relative;
 }
 
 .poster-link,
-.title-link {
+.title-link,
+.season-info-link {
+  display: block;
   color: inherit;
   text-decoration: none;
 }
@@ -892,7 +1055,7 @@ onBeforeUnmount(() => {
   position: relative;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 10px;
   background: #e5e7eb;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -910,6 +1073,23 @@ onBeforeUnmount(() => {
   font-weight: 800;
 }
 
+.episode-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  backdrop-filter: blur(6px);
+}
+
 .status-ribbon {
   position: absolute;
   left: 8px;
@@ -925,8 +1105,137 @@ onBeforeUnmount(() => {
   font-weight: 800;
 }
 
+.status-want-to-watch.status-ribbon {
+  background: #1677ff;
+}
+
+.status-watched.status-ribbon {
+  background: #22c55e;
+}
+
+.status-not-interested.status-ribbon {
+  background: #6b7280;
+}
+
+.poster-action-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(17, 24, 39, 0.62);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.season-card:hover .poster-action-button,
+.poster-action-button.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.poster-action-button:hover,
+.poster-action-button.active {
+  background: rgba(22, 119, 255, 0.9);
+}
+
+.poster-action-button span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.season-action-menu {
+  position: absolute;
+  top: 42px;
+  right: 8px;
+  z-index: 5;
+  width: 128px;
+  border: 1px solid rgba(229, 231, 235, 0.95);
+  border-radius: 6px;
+  padding: 6px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.season-action-menu button {
+  width: 100%;
+  min-height: 34px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 14px;
+  text-align: left;
+}
+
+.season-action-menu button:hover {
+  background: #eef5ff;
+  color: #1677ff;
+}
+
+.season-action-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.action-icon {
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.season-meta {
+  margin-top: 10px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.season-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #111;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.season-rating {
+  flex-shrink: 0;
+  color: #f5a623;
+  font-size: 17px;
+  font-weight: 700;
+}
+
 .card-body {
-  padding-top: 9px;
+  display: none;
 }
 
 .card-body h2 {
@@ -1064,7 +1373,7 @@ onBeforeUnmount(() => {
     overflow: visible;
   }
 
-  .rating-filter {
+  .movie-rating-filter {
     position: static;
   }
 
@@ -1090,6 +1399,20 @@ onBeforeUnmount(() => {
   .rating-range-control,
   .rating-range-labels {
     width: 100%;
+  }
+
+  .year-options {
+    flex-wrap: nowrap;
+  }
+
+  .year-number-option {
+    width: 60px;
+    min-width: 60px;
+    flex-basis: 60px;
+  }
+
+  .older-year-select {
+    flex: 0 0 auto;
   }
 
   .season-grid {
