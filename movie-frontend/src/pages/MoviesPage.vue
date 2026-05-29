@@ -76,9 +76,10 @@ const selectedUserMovieStatus = ref<{ value: UserMovieStatusFilter | null; name:
 })
 const userRatingMin = ref(1)
 const userRatingMax = ref(5)
-const movieRatingMin = ref(1)
+const movieRatingMin = ref(0)
 const movieRatingMax = ref(10)
-const movieRatingLabelMarks = [1, 5, 10]
+const movieRatingTickMarks = Array.from({ length: 11 }, (_, index) => index)
+const movieRatingLabelMarks = [0, 5, 10]
 const isUserLoggedIn = ref(isLoggedIn())
 const ratingRangeControlRef = ref<HTMLElement | null>(null)
 const ratingRangeDragState = ref<RatingRangeDragState | null>(null)
@@ -125,7 +126,7 @@ const userRatingRangeLabel = computed(() => {
 })
 const userRatingRangeStart = computed(() => `${((userRatingMin.value - 1) / 4) * 100}%`)
 const userRatingRangeEnd = computed(() => `${100 - ((userRatingMax.value - 1) / 4) * 100}%`)
-const hasMovieRatingRangeFilter = computed(() => movieRatingMin.value !== 1 || movieRatingMax.value !== 10)
+const hasMovieRatingRangeFilter = computed(() => movieRatingMin.value !== 0 || movieRatingMax.value !== 10)
 const movieRatingRangeLabel = computed(() => {
   if (!hasMovieRatingRangeFilter.value) {
     return '全部'
@@ -134,8 +135,8 @@ const movieRatingRangeLabel = computed(() => {
     ? `${movieRatingMin.value}分`
     : `${movieRatingMin.value}-${movieRatingMax.value}分`
 })
-const movieRatingRangeStart = computed(() => `${((movieRatingMin.value - 1) / 9) * 100}%`)
-const movieRatingRangeEnd = computed(() => `${100 - ((movieRatingMax.value - 1) / 9) * 100}%`)
+const movieRatingRangeStart = computed(() => `${(movieRatingMin.value / 10) * 100}%`)
+const movieRatingRangeEnd = computed(() => `${100 - (movieRatingMax.value / 10) * 100}%`)
 const visiblePages = computed(() => {
   const total = totalPages.value
   const current = page.value
@@ -415,16 +416,16 @@ function handleRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEven
 }
 
 function clampMovieRating(value: number) {
-  return Math.min(10, Math.max(1, value))
+  return Math.min(10, Math.max(0, value))
 }
 
 function getMovieRatingPointPosition(score: number) {
-  return `${((score - 1) / 9) * 100}%`
+  return `${(score / 10) * 100}%`
 }
 
 function getMovieRatingLabelStyle(score: number) {
   let transform = 'translateX(-50%)'
-  if (score === 1) {
+  if (score === 0) {
     transform = 'translateX(0)'
   } else if (score === 10) {
     transform = 'translateX(-100%)'
@@ -447,7 +448,7 @@ function getMovieRatingFromPointer(event: PointerEvent) {
 
   const rect = movieRatingRangeControlRef.value.getBoundingClientRect()
   const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
-  return clampMovieRating(Math.round(ratio * 9) + 1)
+  return clampMovieRating(Math.round(ratio * 10))
 }
 
 function chooseMovieRatingRangeHandle(value: number): RatingRangeHandle | null {
@@ -1054,7 +1055,7 @@ onBeforeUnmount(() => {
                 >
                   <div class="rating-range-track">
                     <span
-                      v-for="score in 10"
+                      v-for="score in movieRatingTickMarks"
                       :key="score"
                       class="rating-range-tick"
                       :style="{ left: getMovieRatingPointPosition(score) }"
@@ -1067,7 +1068,7 @@ onBeforeUnmount(() => {
                     :class="{ dragging: movieRatingRangeDragState?.handle === 'min' }"
                     aria-label="最低评分"
                     :aria-valuenow="movieRatingMin"
-                    aria-valuemin="1"
+                    aria-valuemin="0"
                     aria-valuemax="10"
                     @pointerdown.stop="startMovieRatingRangeDrag($event, 'min')"
                     @keydown="handleMovieRatingRangeKeydown('min', $event)"
@@ -1078,7 +1079,7 @@ onBeforeUnmount(() => {
                     :class="{ dragging: movieRatingRangeDragState?.handle === 'max' }"
                     aria-label="最高评分"
                     :aria-valuenow="movieRatingMax"
-                    aria-valuemin="1"
+                    aria-valuemin="0"
                     aria-valuemax="10"
                     @pointerdown.stop="startMovieRatingRangeDrag($event, 'max')"
                     @keydown="handleMovieRatingRangeKeydown('max', $event)"

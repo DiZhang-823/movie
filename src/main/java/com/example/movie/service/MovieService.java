@@ -173,10 +173,11 @@ public class MovieService {
         }
 
         for (TmdbMovieResponse.Genre genreResponse : genreResponses) {
-            Genre genre = genreRepository.findByTmdbId(genreResponse.getId())
+            Genre genre = genreRepository.findByTmdbIdAndMediaType(genreResponse.getId(), "MOVIE")
                     .orElseGet(() -> {
                         Genre newGenre = new Genre();
                         newGenre.setTmdbId(genreResponse.getId());
+                        newGenre.setMediaType("MOVIE");
                         newGenre.setName(genreResponse.getName());
                         return genreRepository.save(newGenre);
                     });

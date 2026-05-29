@@ -36,7 +36,7 @@ public class GenreController {
     // 查询本地数据库中的 genre
     @GetMapping
     @Operation(summary = "getLocalGenres: Get movie genres from local database.")
-    public List<Genre> getLocalGenres() {
-        return genreService.getAllLocalGenres();
+    public List<Genre> getLocalGenres(@RequestParam(required = false) String mediaType) {
+        return genreService.getLocalGenresByMediaType(mediaType);
     }
 }

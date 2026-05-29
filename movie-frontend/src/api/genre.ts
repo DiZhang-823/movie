@@ -6,8 +6,8 @@ export interface GenreItem {
     name: string
 }
 
-export async function getGenres(): Promise<GenreItem[]> {
-    const response = await request(`/genres`)
+export async function getGenres(mediaType = 'MOVIE'): Promise<GenreItem[]> {
+    const response = await request(`/genres?mediaType=${encodeURIComponent(mediaType)}`)
 
     if (!response.ok) {
         throw new Error('Failed to fetch genres')

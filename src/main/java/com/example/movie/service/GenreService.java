@@ -32,9 +32,11 @@ public class GenreService {
         List<Genre> savedGenres = new ArrayList<>();
 
         for (TmdbGenreDto dto : tmdbGenres) {
-            Genre genre = genreRepository.findByTmdbId(dto.getId().longValue()).orElseGet(Genre::new);
+            Genre genre = genreRepository.findByTmdbIdAndMediaType(dto.getId().longValue(), "MOVIE")
+                    .orElseGet(Genre::new);
 
             genre.setTmdbId(dto.getId().longValue());
+            genre.setMediaType("MOVIE");
             genre.setName(dto.getName());
 
             savedGenres.add(genreRepository.save(genre));
@@ -44,6 +46,13 @@ public class GenreService {
     }
 
     public List<Genre> getAllLocalGenres() {
-        return genreRepository.findAll();
+        return getLocalGenresByMediaType("MOVIE");
+    }
+
+    public List<Genre> getLocalGenresByMediaType(String mediaType) {
+        String resolvedMediaType = mediaType == null || mediaType.isBlank()
+                ? "MOVIE"
+                : mediaType.trim().toUpperCase();
+        return genreRepository.findByMediaTypeOrderByNameAsc(resolvedMediaType);
     }
 }

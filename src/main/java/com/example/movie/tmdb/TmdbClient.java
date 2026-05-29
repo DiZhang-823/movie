@@ -42,6 +42,23 @@ public class TmdbClient {
         return response.getGenres();
     }
 
+    public List<TmdbGenreDto> getTvGenres() {
+        TmdbGenreListResponse response = restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/genre/tv/list")
+                        .queryParam("language", tmdbProperties.getLanguage())
+                        .build()
+                )
+                .retrieve()
+                .body(TmdbGenreListResponse.class);
+
+        if (response == null || response.getGenres() == null) {
+            return List.of();
+        }
+
+        return response.getGenres();
+    }
+
     /**
      * 获取人物详情
      */
@@ -65,6 +82,40 @@ public class TmdbClient {
                 )
                 .retrieve()
                 .body(TmdbMovieResponse.class);
+    }
+
+    public TmdbTvShowResponse getTvShowById(Long tvId) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/tv/{series_id}")
+                        .queryParam("language", "zh-CN")
+                        .queryParam("append_to_response", "external_ids")
+                        .build(tvId)
+                )
+                .retrieve()
+                .body(TmdbTvShowResponse.class);
+    }
+
+    public TmdbTvSeasonResponse getTvSeasonByNumber(Long tvId, Integer seasonNumber) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/tv/{series_id}/season/{season_number}")
+                        .queryParam("language", "zh-CN")
+                        .build(tvId, seasonNumber)
+                )
+                .retrieve()
+                .body(TmdbTvSeasonResponse.class);
+    }
+
+    public TmdbCreditsResponse getTvSeasonCredits(Long tvId, Integer seasonNumber) {
+        return restClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/tv/{series_id}/season/{season_number}/credits")
+                        .queryParam("language", "zh-CN")
+                        .build(tvId, seasonNumber)
+                )
+                .retrieve()
+                .body(TmdbCreditsResponse.class);
     }
 
     public TmdbCreditsResponse getCreditsById(Long movieId) {

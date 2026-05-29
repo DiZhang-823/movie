@@ -3,6 +3,8 @@ import Layout from '../layout/Layout.vue'
 import LoginPage from '../pages/LoginPage.vue'
 import MoviesPage from '../pages/MoviesPage.vue'
 import MovieDetailPage from '../pages/MovieDetailPage.vue'
+import TvSeasonsPage from '../pages/TvSeasonsPage.vue'
+import TvSeasonDetailPage from '../pages/TvSeasonDetailPage.vue'
 import PersonDetailPage from '../pages/PersonDetailPage.vue'
 import PersonsPage from '../pages/PersonsPage.vue'
 import RegisterPage from '../pages/RegisterPage.vue'
@@ -34,8 +36,17 @@ const router = createRouter({
                     meta: { title: '首页' }
                 },
                 {
+                    path: 'tv-seasons',
+                    component: TvSeasonsPage,
+                    meta: { title: '剧集' }
+                },
+                {
                     path: '/movies/:id',
                     component: MovieDetailPage
+                },
+                {
+                    path: '/tv-seasons/:id',
+                    component: TvSeasonDetailPage
                 },
                 {
                     path: 'persons',

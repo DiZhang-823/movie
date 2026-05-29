@@ -5,6 +5,7 @@
         <div class="logo" @click="goHome">海盗电台</div>
 
         <nav class="nav-menu">
+          <router-link to="/tv-seasons">剧集</router-link>
           <router-link to="/movies">电影</router-link>
           <router-link to="/persons">人物</router-link>
           <router-link v-if="currentUser?.isAdmin" to="/admin/tmdb-import">后台管理</router-link>

@@ -13,9 +13,9 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")   // 只对 /api 开头的接口生效
-                .allowedOrigins(frontedUrl)  // 允许前端地址
-                .allowedMethods("*")   // GET, POST, PUT, DELETE 都允许
-                .allowedHeaders("*");  // 允许所有请求头
+        registry.addMapping("/api/**")
+                .allowedOrigins(frontedUrl, "http://localhost:5173", "http://127.0.0.1:5173")
+                .allowedMethods("*")
+                .allowedHeaders("*");
     }
 }
