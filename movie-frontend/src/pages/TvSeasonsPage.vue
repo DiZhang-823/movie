@@ -464,6 +464,21 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <div class="filter-row">
+        <span class="label">排序：</span>
+        <div class="options">
+          <button
+            v-for="sort in sortOptions"
+            :key="sort.sortBy"
+            class="option"
+            :class="{ active: selectedSort.sortBy === sort.sortBy }"
+            @click="selectedSort = sort; resetPageAndLoad()"
+          >
+            {{ sort.name }}
+          </button>
+        </div>
+      </div>
+
       <div class="filter-row movie-rating-filter-row">
         <span class="label">评分：</span>
         <div class="options movie-rating-options">
@@ -541,21 +556,6 @@ onBeforeUnmount(() => {
             <span class="range-separator">-</span>
             <input v-model.number="userRatingMax" class="number-input" type="number" min="1" max="5" placeholder="最高" @change="resetPageAndLoad" />
           </template>
-        </div>
-      </div>
-
-      <div class="filter-row">
-        <span class="label">排序：</span>
-        <div class="options">
-          <button
-            v-for="sort in sortOptions"
-            :key="sort.sortBy"
-            class="option"
-            :class="{ active: selectedSort.sortBy === sort.sortBy }"
-            @click="selectedSort = sort; resetPageAndLoad()"
-          >
-            {{ sort.name }}
-          </button>
         </div>
       </div>
 
@@ -700,7 +700,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .filter-row:last-child {
@@ -708,10 +708,10 @@ onBeforeUnmount(() => {
 }
 
 .label {
-  flex: 0 0 auto;
-  line-height: 30px;
+  flex-shrink: 0;
+  line-height: 28px;
   font-size: 13px;
-  color: #374151;
+  white-space: nowrap;
 }
 
 .options {
@@ -722,14 +722,14 @@ onBeforeUnmount(() => {
 }
 
 .option {
-  min-height: 30px;
-  padding: 0 10px;
+  padding: 4px 10px;
   border: none;
   border-radius: 4px;
   background: transparent;
   color: #111827;
   cursor: pointer;
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .option:hover {
@@ -797,12 +797,20 @@ onBeforeUnmount(() => {
 }
 
 .search-options {
-  flex: 1 1 360px;
+  flex: 0 1 360px;
 }
 
 .search-input {
-  width: min(380px, 100%);
+  width: 100%;
+  height: 28px;
   padding: 0 12px;
+  color: #172033;
+}
+
+.search-input:focus {
+  border-color: #9dc8ff;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
 }
 
 .compact-options {
