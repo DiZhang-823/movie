@@ -232,6 +232,19 @@ public class TvSeasonService {
         return savedSeason;
     }
 
+    public List<TvSeason> syncTvShowSeasons(Long tvId) {
+        TmdbTvShowResponse tvShow = tmdbClient.getTvShowById(tvId);
+        if (tvShow == null || tvShow.getSeasons() == null || tvShow.getSeasons().isEmpty()) {
+            return List.of();
+        }
+
+        return tvShow.getSeasons()
+                .stream()
+                .filter(season -> season.getSeasonNumber() != null && season.getSeasonNumber() > 0)
+                .map(season -> syncTvSeason(tvId, season.getSeasonNumber()))
+                .toList();
+    }
+
     private void syncCredits(TvSeason tvSeason, TmdbCreditsResponse creditsResponse) {
         if (creditsResponse == null) {
             return;

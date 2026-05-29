@@ -98,6 +98,48 @@ export async function runTmdbImportBatch(tmdbId: number, count = 1): Promise<Tmd
     return await response.json()
 }
 
+export async function fetchTmdbTvSeasonImportStatus(): Promise<TmdbImportStatus> {
+    const response = await request('/admin/tmdb-tv-seasons/status')
+    if (!response.ok) {
+        throw new Error('Failed to load TMDB TV season import status')
+    }
+    return await response.json()
+}
+
+export async function setTmdbTvSeasonImportEnabled(enabled: boolean): Promise<TmdbImportStatus> {
+    const response = await request('/admin/tmdb-tv-seasons/switch', {
+        method: 'PUT',
+        body: JSON.stringify({ enabled })
+    })
+    if (!response.ok) {
+        throw new Error('Failed to update TMDB TV season import switch')
+    }
+    return await response.json()
+}
+
+export async function setTmdbTvSeasonImportInterval(intervalSeconds: number): Promise<TmdbImportStatus> {
+    const response = await request('/admin/tmdb-tv-seasons/interval', {
+        method: 'PUT',
+        body: JSON.stringify({ intervalSeconds })
+    })
+    if (!response.ok) {
+        throw new Error('Failed to update TMDB TV season import interval')
+    }
+    return await response.json()
+}
+
+export async function runTmdbTvSeasonImportBatch(tmdbId: number, count = 1): Promise<TmdbImportRunResult> {
+    const response = await request('/admin/tmdb-tv-seasons/run', {
+        method: 'POST',
+        body: JSON.stringify({ tmdbId, count })
+    })
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Failed to run TMDB TV season import')
+    }
+    return await response.json()
+}
+
 export async function fetchImdbRatingsSyncStatus(): Promise<ImdbRatingsSyncStatus> {
     const response = await request('/admin/imdb-ratings/status')
     if (!response.ok) {

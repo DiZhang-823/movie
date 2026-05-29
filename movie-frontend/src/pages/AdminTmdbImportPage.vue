@@ -3,9 +3,13 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   fetchImdbRatingsSyncStatus,
   fetchTmdbImportStatus,
+  fetchTmdbTvSeasonImportStatus,
   runTmdbImportBatch,
+  runTmdbTvSeasonImportBatch,
   setTmdbImportEnabled,
   setTmdbImportInterval,
+  setTmdbTvSeasonImportEnabled,
+  setTmdbTvSeasonImportInterval,
   syncImdbRatings,
   syncMissingImdbRatings,
   type ImdbRatingsSyncStatus,
@@ -14,14 +18,21 @@ import {
 } from '../api/tmdbImport'
 
 const status = ref<TmdbImportStatus | null>(null)
+const tvSeasonStatus = ref<TmdbImportStatus | null>(null)
 const loading = ref(false)
 const switching = ref(false)
+const tvSeasonSwitching = ref(false)
 const savingInterval = ref(false)
+const savingTvSeasonInterval = ref(false)
 const running = ref(false)
+const tvSeasonRunning = ref(false)
 const imdbSyncing = ref(false)
 const tmdbId = ref<number | null>(null)
+const tvSeasonTmdbId = ref<number | null>(null)
 const importCount = ref(1)
+const tvSeasonImportCount = ref(1)
 const intervalSeconds = ref<number | null>(null)
+const tvSeasonIntervalSeconds = ref<number | null>(null)
 const imdbSyncResult = ref<ImdbRatingsSyncResult | null>(null)
 const imdbSyncStatus = ref<ImdbRatingsSyncStatus | null>(null)
 const message = ref('')
@@ -33,6 +44,13 @@ const statusText = computed(() => {
     return '读取中'
   }
   return status.value.enabled ? '运行中' : '已暂停'
+})
+
+const tvSeasonStatusText = computed(() => {
+  if (!tvSeasonStatus.value) {
+    return '读取中'
+  }
+  return tvSeasonStatus.value.enabled ? '运行中' : '已暂停'
 })
 
 const imdbSyncRunning = computed(() => imdbSyncing.value || imdbSyncStatus.value?.syncing === true)
@@ -50,6 +68,24 @@ async function loadStatus() {
   } catch (error) {
     console.error(error)
     errorMessage.value = '读取导入状态失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadTvSeasonStatus() {
+  loading.value = true
+  errorMessage.value = ''
+
+  try {
+    tvSeasonStatus.value = await fetchTmdbTvSeasonImportStatus()
+    if (tvSeasonTmdbId.value === null) {
+      tvSeasonTmdbId.value = tvSeasonStatus.value.nextTmdbId
+    }
+    tvSeasonIntervalSeconds.value = tvSeasonStatus.value.intervalSeconds
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '读取剧集导入状态失败'
   } finally {
     loading.value = false
   }
@@ -75,6 +111,7 @@ async function loadImdbSyncStatus() {
 async function refreshStatus() {
   await Promise.all([
     loadStatus(),
+    loadTvSeasonStatus(),
     loadImdbSyncStatus()
   ])
 }
@@ -96,6 +133,26 @@ async function toggleImport() {
     errorMessage.value = '更新开关失败'
   } finally {
     switching.value = false
+  }
+}
+
+async function toggleTvSeasonImport() {
+  if (!tvSeasonStatus.value) {
+    return
+  }
+
+  tvSeasonSwitching.value = true
+  message.value = ''
+  errorMessage.value = ''
+
+  try {
+    tvSeasonStatus.value = await setTmdbTvSeasonImportEnabled(!tvSeasonStatus.value.enabled)
+    message.value = tvSeasonStatus.value.enabled ? '剧集定时任务已开启' : '剧集定时任务已暂停'
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '更新剧集定时任务开关失败'
+  } finally {
+    tvSeasonSwitching.value = false
   }
 }
 
@@ -122,6 +179,32 @@ async function saveInterval() {
     errorMessage.value = '更新间隔时长失败'
   } finally {
     savingInterval.value = false
+  }
+}
+
+async function saveTvSeasonInterval() {
+  if (!Number.isInteger(tvSeasonIntervalSeconds.value) || tvSeasonIntervalSeconds.value === null || tvSeasonIntervalSeconds.value < 1) {
+    errorMessage.value = '请输入有效的剧集导入间隔'
+    return
+  }
+  if (tvSeasonIntervalSeconds.value > 86400) {
+    errorMessage.value = '剧集导入间隔不能超过 86400 秒'
+    return
+  }
+
+  savingTvSeasonInterval.value = true
+  message.value = ''
+  errorMessage.value = ''
+
+  try {
+    tvSeasonStatus.value = await setTmdbTvSeasonImportInterval(tvSeasonIntervalSeconds.value)
+    tvSeasonIntervalSeconds.value = tvSeasonStatus.value.intervalSeconds
+    message.value = `剧集定时任务间隔已更新为 ${tvSeasonStatus.value.intervalSeconds} 秒`
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '更新剧集导入间隔失败'
+  } finally {
+    savingTvSeasonInterval.value = false
   }
 }
 
@@ -158,6 +241,42 @@ async function runBatch() {
     errorMessage.value = '手动导入失败，请确认 TMDB ID 和导入次数是否正确'
   } finally {
     running.value = false
+  }
+}
+
+async function runTvSeasonBatch() {
+  if (!tvSeasonTmdbId.value || tvSeasonTmdbId.value < 1) {
+    errorMessage.value = '请输入有效的 TMDB 剧集 ID'
+    return
+  }
+  if (!Number.isInteger(tvSeasonImportCount.value) || tvSeasonImportCount.value < 1) {
+    errorMessage.value = '请输入有效的剧集导入次数'
+    return
+  }
+
+  tvSeasonRunning.value = true
+  message.value = ''
+  errorMessage.value = ''
+
+  try {
+    const result = await runTmdbTvSeasonImportBatch(tvSeasonTmdbId.value, tvSeasonImportCount.value)
+    const failedIds = result.items
+      .filter((item) => !item.success)
+      .map((item) => item.tmdbId)
+
+    message.value = `已从 TMDB 剧集 ${result.startTmdbId} 开始导入 ${result.requestedCount} 个，成功 ${result.successCount} 个，失败 ${result.failureCount} 个`
+    if (failedIds.length > 0) {
+      message.value += `。失败 ID：${failedIds.slice(0, 8).join('、')}`
+      if (failedIds.length > 8) {
+        message.value += '...'
+      }
+    }
+    await loadTvSeasonStatus()
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '手动导入剧集失败，请确认 TMDB 剧集 ID 和导入次数是否正确'
+  } finally {
+    tvSeasonRunning.value = false
   }
 }
 
@@ -331,6 +450,86 @@ onBeforeUnmount(() => {
         </label>
         <button class="secondary-btn" :disabled="!status || savingInterval" @click="saveInterval">
           {{ savingInterval ? '保存中' : '保存间隔' }}
+        </button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>TMDB 剧集定时导入</h2>
+          <p>按 TMDB 剧集 ID 从小到大自动导入，每个剧集 ID 会导入该剧所有正式季。</p>
+        </div>
+      </div>
+
+      <div class="status-grid">
+        <div class="status-item">
+          <span>定时任务</span>
+          <strong :class="{ paused: !tvSeasonStatus?.enabled }">{{ tvSeasonStatusText }}</strong>
+        </div>
+        <div class="status-item">
+          <span>下一次自动导入剧集 ID</span>
+          <strong>{{ tvSeasonStatus?.nextTmdbId ?? '-' }}</strong>
+        </div>
+        <div class="status-item">
+          <span>导入间隔</span>
+          <strong>{{ tvSeasonStatus?.intervalSeconds ?? '-' }} 秒</strong>
+        </div>
+        <div class="status-item">
+          <span>最近更新时间</span>
+          <strong>{{ formatDateTime(tvSeasonStatus?.updatedAt) }}</strong>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button
+          class="primary-btn"
+          :class="{ danger: tvSeasonStatus?.enabled }"
+          :disabled="!tvSeasonStatus || tvSeasonSwitching"
+          @click="toggleTvSeasonImport"
+        >
+          {{ tvSeasonStatus?.enabled ? '暂停剧集定时任务' : '开启剧集定时任务' }}
+        </button>
+        <label class="form-field interval-field">
+          <span>间隔时长（秒）</span>
+          <input
+            v-model.number="tvSeasonIntervalSeconds"
+            type="number"
+            min="1"
+            max="86400"
+            placeholder="例如 300"
+          />
+        </label>
+        <button class="secondary-btn" :disabled="!tvSeasonStatus || savingTvSeasonInterval" @click="saveTvSeasonInterval">
+          {{ savingTvSeasonInterval ? '保存中' : '保存间隔' }}
+        </button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>手动批量导入 TMDB 剧集</h2>
+      <p>从输入的 TMDB 剧集 ID 开始，按 ID 递增导入指定次数；每个 ID 会导入全部正式季。</p>
+      <div class="run-form">
+        <label class="form-field">
+          <span>起始 TMDB 剧集 ID</span>
+          <input
+            v-model.number="tvSeasonTmdbId"
+            type="number"
+            min="1"
+            placeholder="输入 TMDB 剧集 ID"
+          />
+        </label>
+        <label class="form-field count-field">
+          <span>导入次数</span>
+          <input
+            v-model.number="tvSeasonImportCount"
+            type="number"
+            min="1"
+            placeholder="1"
+          />
+        </label>
+        <button class="primary-btn" :disabled="tvSeasonRunning" @click="runTvSeasonBatch">
+          {{ tvSeasonRunning ? '导入中' : '立即导入' }}
         </button>
       </div>
     </section>
