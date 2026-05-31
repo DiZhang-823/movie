@@ -6,6 +6,7 @@ export interface TvSeasonItem {
   tmdbTvId: number
   tmdbSeasonId: number | null
   seasonNumber: number
+  seasonCount: number | null
   title: string
   originalTitle: string | null
   showName: string
@@ -56,6 +57,7 @@ export interface TvSeasonDetail {
   tmdbTvId: number
   tmdbSeasonId: number | null
   seasonNumber: number
+  seasonCount: number | null
   title: string
   originalTitle: string | null
   showName: string

@@ -311,6 +311,10 @@ function getDisplayVoteCount(item: TvSeasonItem) {
   return item.imdbVoteCount ?? item.voteCount
 }
 
+function getDisplayTitle(item: TvSeasonItem) {
+  return item.seasonCount === 1 ? item.showName : item.title
+}
+
 function formatScore(value: number | null | undefined) {
   return value === null || value === undefined ? '暂无' : Number(value).toFixed(2)
 }
@@ -494,7 +498,7 @@ onBeforeUnmount(() => {
             </button>
 
             <div v-if="ratingRangePopoverOpen" class="rating-range-popover">
-              <div class="rating-range-popover-title">璇勫垎</div>
+              <div class="rating-range-popover-title">评分</div>
               <div class="rating-range-panel">
                 <div
                   :ref="setRatingRangeControlRef"
@@ -581,8 +585,8 @@ onBeforeUnmount(() => {
         <div class="poster-shell">
           <RouterLink class="poster-link" :to="`/tv-seasons/${item.id}`">
             <div class="poster-wrap">
-              <img v-if="item.posterPath" :src="getPosterUrl(item.posterPath)" :alt="item.title" />
-              <div v-else class="poster-placeholder">{{ item.title.slice(0, 1) }}</div>
+              <img v-if="item.posterPath" :src="getPosterUrl(item.posterPath)" :alt="getDisplayTitle(item)" />
+              <div v-else class="poster-placeholder">{{ getDisplayTitle(item).slice(0, 1) }}</div>
               <div class="episode-badge">{{ item.episodeCount ?? '-' }} 集</div>
               <div
                 v-if="item.userTvSeasonStatus"
@@ -630,7 +634,7 @@ onBeforeUnmount(() => {
         <RouterLink class="season-info-link" :to="`/tv-seasons/${item.id}`">
           <div class="season-meta">
             <div class="season-title">
-              {{ item.title }}<span v-if="item.year"> ({{ item.year }})</span>
+              {{ getDisplayTitle(item) }}<span v-if="item.year"> ({{ item.year }})</span>
             </div>
             <div class="season-rating">{{ formatScore(getDisplayVoteAverage(item)) }}</div>
           </div>

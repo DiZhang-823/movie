@@ -34,6 +34,9 @@ public class TvSeason {
     @Column(name = "season_number", nullable = false)
     private Integer seasonNumber;
 
+    @Column(name = "season_count")
+    private Integer seasonCount;
+
     @Column(nullable = false)
     private String title;
 

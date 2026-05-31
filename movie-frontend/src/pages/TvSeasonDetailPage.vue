@@ -19,6 +19,7 @@ const visibleCastCount = ref(12)
 const displayCast = computed(() => season.value?.cast.slice(0, visibleCastCount.value) ?? [])
 const hasMoreCast = computed(() => (season.value?.cast.length ?? 0) > visibleCastCount.value)
 const releaseYear = computed(() => season.value?.year || season.value?.airDate?.slice(0, 4) || '年份未知')
+const displayTitle = computed(() => season.value?.seasonCount === 1 ? season.value.showName : season.value?.title)
 const heroStyle = computed(() => {
   if (!season.value?.posterPath) return {}
   return { '--detail-backdrop': `url("${getImageUrl(season.value.posterPath, 'w500')}")` }
@@ -32,7 +33,7 @@ async function loadPage() {
   try {
     const id = Number(route.params.id)
     season.value = await getTvSeasonById(id)
-    document.title = `${season.value.title} - 剧集`
+    document.title = `${displayTitle.value} - 剧集`
 
     const token = getToken()
     if (token) {
@@ -122,13 +123,13 @@ watch(() => route.params.id, () => {
       <section class="detail-hero" :style="heroStyle">
         <div class="hero-inner">
           <div class="poster-box">
-            <img v-if="season.posterPath" :src="getImageUrl(season.posterPath, 'w500')" :alt="season.title" />
-            <div v-else class="poster-placeholder">{{ season.title.slice(0, 1) }}</div>
+            <img v-if="season.posterPath" :src="getImageUrl(season.posterPath, 'w500')" :alt="displayTitle" />
+            <div v-else class="poster-placeholder">{{ displayTitle?.slice(0, 1) }}</div>
           </div>
 
           <div class="hero-main">
             <div class="title-row">
-              <h1>{{ season.title }}</h1>
+              <h1>{{ displayTitle }}</h1>
               <span>{{ releaseYear }}</span>
             </div>
             <p class="original-title">{{ season.originalTitle || season.originalShowName || '原名未知' }}</p>

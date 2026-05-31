@@ -210,9 +210,10 @@ public class TvSeasonService {
         tvSeason.setTmdbTvId(tvShow.getId());
         tvSeason.setTmdbSeasonId(tmdbSeason.getId());
         tvSeason.setSeasonNumber(tmdbSeason.getSeasonNumber());
+        tvSeason.setSeasonCount(countOfficialSeasons(tvShow.getSeasons()));
         tvSeason.setShowName(tvShow.getName());
         tvSeason.setOriginalShowName(tvShow.getOriginalName());
-        tvSeason.setTitle(buildChineseSeasonTitle(tvShow.getName(), tmdbSeason.getSeasonNumber()));
+        tvSeason.setTitle(buildSeasonTitle(tvShow.getName(), tmdbSeason.getName(), tmdbSeason.getSeasonNumber()));
         tvSeason.setOriginalTitle(buildOriginalSeasonTitle(tvShow.getOriginalName(), tmdbSeason.getSeasonNumber()));
         tvSeason.setOverview(firstText(tmdbSeason.getOverview(), tvShow.getOverview()));
         tvSeason.setPosterPath(firstText(tmdbSeason.getPosterPath(), tvShow.getPosterPath()));
@@ -321,6 +322,7 @@ public class TvSeasonService {
         response.setTmdbTvId(tvSeason.getTmdbTvId());
         response.setTmdbSeasonId(tvSeason.getTmdbSeasonId());
         response.setSeasonNumber(tvSeason.getSeasonNumber());
+        response.setSeasonCount(tvSeason.getSeasonCount());
         response.setTitle(tvSeason.getTitle());
         response.setOriginalTitle(tvSeason.getOriginalTitle());
         response.setShowName(tvSeason.getShowName());
@@ -350,6 +352,7 @@ public class TvSeasonService {
         response.setTmdbTvId(tvSeason.getTmdbTvId());
         response.setTmdbSeasonId(tvSeason.getTmdbSeasonId());
         response.setSeasonNumber(tvSeason.getSeasonNumber());
+        response.setSeasonCount(tvSeason.getSeasonCount());
         response.setTitle(tvSeason.getTitle());
         response.setOriginalTitle(tvSeason.getOriginalTitle());
         response.setShowName(tvSeason.getShowName());
@@ -518,11 +521,21 @@ public class TvSeasonService {
         return country.getName();
     }
 
-    private String buildChineseSeasonTitle(String showName, Integer seasonNumber) {
+    private String buildSeasonTitle(String showName, String seasonName, Integer seasonNumber) {
+        String resolvedSeasonName = hasText(seasonName) ? seasonName : "第" + seasonNumber + "季";
         if (!hasText(showName)) {
-            return "第" + seasonNumber + "季";
+            return resolvedSeasonName;
         }
-        return showName + " 第" + seasonNumber + "季";
+        return showName + " " + resolvedSeasonName;
+    }
+
+    private Integer countOfficialSeasons(List<TmdbTvShowResponse.Season> seasons) {
+        if (seasons == null || seasons.isEmpty()) {
+            return 0;
+        }
+        return (int) seasons.stream()
+                .filter(season -> season.getSeasonNumber() != null && season.getSeasonNumber() > 0)
+                .count();
     }
 
     private String buildOriginalSeasonTitle(String showName, Integer seasonNumber) {

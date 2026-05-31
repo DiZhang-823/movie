@@ -13,6 +13,7 @@ public class TvSeasonDetailResponse {
     private Long tmdbTvId;
     private Long tmdbSeasonId;
     private Integer seasonNumber;
+    private Integer seasonCount;
     private String title;
     private String originalTitle;
     private String showName;
