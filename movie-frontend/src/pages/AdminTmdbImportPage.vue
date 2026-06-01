@@ -430,23 +430,13 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="actions">
-        <button
-          class="primary-btn"
-          :class="{ danger: status?.enabled }"
-          :disabled="!status || switching"
-          @click="toggleImport"
-        >
+        <button class="primary-btn" :class="{ danger: status?.enabled }" :disabled="!status || switching"
+          @click="toggleImport">
           {{ status?.enabled ? '暂停定时任务' : '开启定时任务' }}
         </button>
         <label class="form-field interval-field">
           <span>间隔时长（秒）</span>
-          <input
-            v-model.number="intervalSeconds"
-            type="number"
-            min="1"
-            max="86400"
-            placeholder="例如 10"
-          />
+          <input v-model.number="intervalSeconds" type="number" min="1" max="86400" placeholder="例如 10" />
         </label>
         <button class="secondary-btn" :disabled="!status || savingInterval" @click="saveInterval">
           {{ savingInterval ? '保存中' : '保存间隔' }}
@@ -482,25 +472,16 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="actions">
-        <button
-          class="primary-btn"
-          :class="{ danger: tvSeasonStatus?.enabled }"
-          :disabled="!tvSeasonStatus || tvSeasonSwitching"
-          @click="toggleTvSeasonImport"
-        >
+        <button class="primary-btn" :class="{ danger: tvSeasonStatus?.enabled }"
+          :disabled="!tvSeasonStatus || tvSeasonSwitching" @click="toggleTvSeasonImport">
           {{ tvSeasonStatus?.enabled ? '暂停剧集定时任务' : '开启剧集定时任务' }}
         </button>
         <label class="form-field interval-field">
           <span>间隔时长（秒）</span>
-          <input
-            v-model.number="tvSeasonIntervalSeconds"
-            type="number"
-            min="1"
-            max="86400"
-            placeholder="例如 300"
-          />
+          <input v-model.number="tvSeasonIntervalSeconds" type="number" min="1" max="86400" placeholder="例如 300" />
         </label>
-        <button class="secondary-btn" :disabled="!tvSeasonStatus || savingTvSeasonInterval" @click="saveTvSeasonInterval">
+        <button class="secondary-btn" :disabled="!tvSeasonStatus || savingTvSeasonInterval"
+          @click="saveTvSeasonInterval">
           {{ savingTvSeasonInterval ? '保存中' : '保存间隔' }}
         </button>
       </div>
@@ -512,21 +493,11 @@ onBeforeUnmount(() => {
       <div class="run-form">
         <label class="form-field">
           <span>起始 TMDB 剧集 ID</span>
-          <input
-            v-model.number="tvSeasonTmdbId"
-            type="number"
-            min="1"
-            placeholder="输入 TMDB 剧集 ID"
-          />
+          <input v-model.number="tvSeasonTmdbId" type="number" min="1" placeholder="输入 TMDB 剧集 ID" />
         </label>
         <label class="form-field count-field">
           <span>导入次数</span>
-          <input
-            v-model.number="tvSeasonImportCount"
-            type="number"
-            min="1"
-            placeholder="1"
-          />
+          <input v-model.number="tvSeasonImportCount" type="number" min="1" placeholder="1" />
         </label>
         <button class="primary-btn" :disabled="tvSeasonRunning" @click="runTvSeasonBatch">
           {{ tvSeasonRunning ? '导入中' : '立即导入' }}
@@ -540,21 +511,11 @@ onBeforeUnmount(() => {
       <div class="run-form">
         <label class="form-field">
           <span>起始 TMDB ID</span>
-          <input
-            v-model.number="tmdbId"
-            type="number"
-            min="1"
-            placeholder="输入 TMDB ID"
-          />
+          <input v-model.number="tmdbId" type="number" min="1" placeholder="输入 TMDB ID" />
         </label>
         <label class="form-field count-field">
           <span>导入次数</span>
-          <input
-            v-model.number="importCount"
-            type="number"
-            min="1"
-            placeholder="1"
-          />
+          <input v-model.number="importCount" type="number" min="1" placeholder="1" />
         </label>
         <button class="primary-btn" :disabled="running" @click="runBatch">
           {{ running ? '导入中' : '立即导入' }}

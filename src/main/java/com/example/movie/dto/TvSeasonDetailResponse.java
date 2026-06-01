@@ -35,4 +35,5 @@ public class TvSeasonDetailResponse {
     private List<PersonItemResponse> directors;
     private List<PersonItemResponse> writers;
     private List<PersonItemResponse> cast;
+    private List<TvSeasonCollectionItemResponse> collectionSeasons;
 }

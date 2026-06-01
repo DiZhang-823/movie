@@ -873,13 +873,13 @@ onBeforeUnmount(() => {
       <div class="filter-row">
         <span class="label">年份：</span>
         <div class="options year-options">
-          <span
+          <button
             class="option"
             :class="{ active: selectedYear === null }"
             @click="handleYearClick(null)"
           >
             全部
-          </span>
+          </button>
           <span
             v-for="year in recentYears"
             :key="year"
@@ -896,7 +896,7 @@ onBeforeUnmount(() => {
             :value="isOlderYearSelected ? selectedYear : ''"
             @change="handleOlderYearChange"
           >
-            <option value="">更早年份</option>
+            <option value="">更早</option>
             <option
               v-for="year in olderYears"
               :key="year"
@@ -1154,14 +1154,6 @@ onBeforeUnmount(() => {
                 class="poster-status-overlay"
                 :class="getStatusClass(movie.userMovieStatus)"
               >
-                <div class="poster-status-line">
-                  <span class="poster-status-pill">
-                    {{ getStatusLabel(movie.userMovieStatus) }}
-                  </span>
-                  <span v-if="getStatusDate(movie)" class="poster-status-date">
-                    {{ formatStatusDate(getStatusDate(movie)) }}
-                  </span>
-                </div>
                 <div v-if="movie.userMovieStatus === 'WATCHED'" class="poster-status-stars">
                   <span
                     v-for="star in 5"
@@ -1169,6 +1161,14 @@ onBeforeUnmount(() => {
                     :class="{ filled: star <= getRatingValue(movie.userRating) }"
                   >
                     ★
+                  </span>
+                </div>
+                <div class="poster-status-line">
+                  <span class="poster-status-pill">
+                    {{ getStatusLabel(movie.userMovieStatus) }}
+                  </span>
+                  <span v-if="getStatusDate(movie)" class="poster-status-date">
+                    {{ formatStatusDate(getStatusDate(movie)) }}
                   </span>
                 </div>
               </div>
@@ -1349,9 +1349,12 @@ onBeforeUnmount(() => {
 }
 
 .option {
-  cursor: pointer;
   padding: 4px 10px;
+  border: none;
   border-radius: 4px;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
 }
@@ -1796,7 +1799,7 @@ onBeforeUnmount(() => {
 .poster-status-stars {
   display: flex;
   gap: 1px;
-  margin-top: 5px;
+  margin-bottom: 5px;
   color: #9ca3af;
   font-size: 16px;
   line-height: 1;
@@ -2070,7 +2073,7 @@ onBeforeUnmount(() => {
 .title-year {
   flex: 1;
   min-width: 0;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   color: #111;
   line-height: 1.4;
@@ -2348,7 +2351,7 @@ onBeforeUnmount(() => {
   }
 
   .poster-status-stars {
-    margin-top: 4px;
+    margin-bottom: 4px;
     font-size: 14px;
   }
 

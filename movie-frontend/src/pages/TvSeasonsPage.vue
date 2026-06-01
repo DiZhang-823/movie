@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getGenres } from '../api/genre'
 import { getTvSeasons, type TvSeasonItem } from '../api/tvSeason'
-import { saveUserTvSeason } from '../api/userTvSeason'
+import { saveUserTvSeason, type UserTvSeasonRequest } from '../api/userTvSeason'
 import { getToken, isLoggedIn } from '../utils/auth'
 
 type UserStatusFilter = 'DEFAULT' | 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
@@ -45,8 +45,12 @@ const ratingLabelMarks = [0, 5, 10]
 const ratingRangeControlRef = ref<HTMLElement | null>(null)
 const ratingRangeDragState = ref<RatingRangeDragState | null>(null)
 const ratingRangePopoverOpen = ref(false)
-const userRatingMin = ref<number | null>(null)
-const userRatingMax = ref<number | null>(null)
+const userRatingMin = ref(1)
+const userRatingMax = ref(5)
+const userRatingTickMarks = [1, 2, 3, 4, 5]
+const userRatingRangeControlRef = ref<HTMLElement | null>(null)
+const userRatingRangeDragState = ref<RatingRangeDragState | null>(null)
+const userRatingRangePopoverOpen = ref(false)
 const isUserLoggedIn = ref(isLoggedIn())
 
 const sortOptions = [
@@ -75,6 +79,12 @@ const totalPages = ref(0)
 const totalElements = ref(0)
 const savingId = ref<number | null>(null)
 const activeActionSeasonId = ref<number | null>(null)
+const watchedEditorSeasonId = ref<number | null>(null)
+const watchedRating = ref<number | null>(null)
+const hoveredWatchedRating = ref<number | null>(null)
+const watchedYear = ref(new Date().getFullYear())
+const watchedMonth = ref(new Date().getMonth() + 1)
+const watchedDay = ref(new Date().getDate())
 const jumpPage = ref('')
 
 let searchTimer: number | undefined
@@ -107,6 +117,21 @@ const ratingRangeLabel = computed(() => {
 })
 const ratingRangeStart = computed(() => `${(ratingMin.value / 10) * 100}%`)
 const ratingRangeEnd = computed(() => `${100 - (ratingMax.value / 10) * 100}%`)
+const showUserRatingRange = computed(() =>
+  isUserLoggedIn.value && selectedStatus.value.value === 'WATCHED'
+)
+const hasUserRatingRangeFilter = computed(() =>
+  showUserRatingRange.value && (userRatingMin.value !== 1 || userRatingMax.value !== 5)
+)
+const userRatingRangeLabel = computed(() => {
+  if (!hasUserRatingRangeFilter.value) return '全部'
+  return userRatingMin.value === userRatingMax.value
+    ? `${userRatingMin.value}星`
+    : `${userRatingMin.value}-${userRatingMax.value}星`
+})
+const userRatingRangeStart = computed(() => `${((userRatingMin.value - 1) / 4) * 100}%`)
+const userRatingRangeEnd = computed(() => `${100 - ((userRatingMax.value - 1) / 4) * 100}%`)
+const watchedDateDisplay = computed(() => buildWatchedDateValue().replaceAll('-', '/'))
 
 function initYears() {
   const currentYear = new Date().getFullYear()
@@ -129,8 +154,8 @@ async function loadTvSeasons() {
       year: selectedYear.value ?? undefined,
       regionCode: selectedRegion.value.code ?? undefined,
       userTvSeasonStatus: isUserLoggedIn.value ? selectedStatus.value.value ?? undefined : undefined,
-      userRatingMin: selectedStatus.value.value === 'WATCHED' ? userRatingMin.value ?? undefined : undefined,
-      userRatingMax: selectedStatus.value.value === 'WATCHED' ? userRatingMax.value ?? undefined : undefined,
+      userRatingMin: hasUserRatingRangeFilter.value ? userRatingMin.value : undefined,
+      userRatingMax: hasUserRatingRangeFilter.value ? userRatingMax.value : undefined,
       tvSeasonRatingMin: hasRatingRangeFilter.value ? ratingMin.value : undefined,
       tvSeasonRatingMax: hasRatingRangeFilter.value ? ratingMax.value : undefined,
       page: page.value,
@@ -167,6 +192,158 @@ function handleOlderYearChange(event: Event) {
 
   selectedYear.value = Number(value)
   resetPageAndLoad()
+}
+
+function handleUserStatusClick(status: { value: UserStatusFilter | null; name: string }) {
+  selectedStatus.value = status
+  userRatingRangePopoverOpen.value = false
+  if (status.value !== 'WATCHED') resetUserRatingRange(false)
+  resetPageAndLoad()
+}
+
+function handleUserStatusOptionClick(
+  status: { value: UserStatusFilter | null; name: string },
+  event: MouseEvent
+) {
+  if (showUserRatingRange.value && status.value === 'WATCHED') {
+    event.stopPropagation()
+    toggleUserRatingRangePopover()
+    return
+  }
+
+  handleUserStatusClick(status)
+}
+
+function resetUserRatingRange(shouldLoad = true) {
+  userRatingMin.value = 1
+  userRatingMax.value = 5
+  if (shouldLoad && showUserRatingRange.value) resetPageAndLoad()
+}
+
+function clampUserRating(value: number) {
+  return Math.min(5, Math.max(1, value))
+}
+
+function getUserRatingPointPosition(star: number) {
+  return `${((star - 1) / 4) * 100}%`
+}
+
+function getUserRatingLabelStyle(star: number) {
+  let transform = 'translateX(-50%)'
+  if (star === 1) transform = 'translateX(0)'
+  if (star === 5) transform = 'translateX(-100%)'
+
+  return {
+    left: getUserRatingPointPosition(star),
+    transform
+  }
+}
+
+function setUserRatingRangeControlRef(element: unknown) {
+  userRatingRangeControlRef.value = element instanceof HTMLElement ? element : null
+}
+
+function getUserRatingFromPointer(event: PointerEvent) {
+  if (!userRatingRangeControlRef.value) return userRatingMin.value
+
+  const rect = userRatingRangeControlRef.value.getBoundingClientRect()
+  const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width))
+  return clampUserRating(Math.round(ratio * 4) + 1)
+}
+
+function chooseUserRatingRangeHandle(value: number): RatingRangeHandle | null {
+  if (userRatingMin.value === userRatingMax.value) {
+    if (value < userRatingMin.value) return 'min'
+    if (value > userRatingMax.value) return 'max'
+    return null
+  }
+
+  const minDistance = Math.abs(value - userRatingMin.value)
+  const maxDistance = Math.abs(value - userRatingMax.value)
+  if (minDistance < maxDistance) return 'min'
+  if (maxDistance < minDistance) return 'max'
+  return value < userRatingMin.value ? 'min' : 'max'
+}
+
+function updateUserRatingRangeHandle(handle: RatingRangeHandle, value: number) {
+  const rating = clampUserRating(value)
+  if (handle === 'min') {
+    userRatingMin.value = Math.min(rating, userRatingMax.value)
+  } else {
+    userRatingMax.value = Math.max(rating, userRatingMin.value)
+  }
+}
+
+function startUserRatingRangeDrag(event: PointerEvent, requestedHandle?: RatingRangeHandle) {
+  event.preventDefault()
+
+  const pointedRating = getUserRatingFromPointer(event)
+  const handlesOverlap = userRatingMin.value === userRatingMax.value
+  const handle = requestedHandle && !handlesOverlap
+    ? requestedHandle
+    : chooseUserRatingRangeHandle(pointedRating)
+
+  userRatingRangeDragState.value = {
+    handle,
+    startX: event.clientX,
+    startMin: userRatingMin.value,
+    startMax: userRatingMax.value
+  }
+
+  if (handle) updateUserRatingRangeHandle(handle, pointedRating)
+
+  window.addEventListener('pointermove', handleUserRatingRangePointerMove)
+  window.addEventListener('pointerup', finishUserRatingRangeDrag)
+}
+
+function handleUserRatingRangePointerMove(event: PointerEvent) {
+  const dragState = userRatingRangeDragState.value
+  if (!dragState) return
+
+  let handle = dragState.handle
+  if (!handle) {
+    const movement = event.clientX - dragState.startX
+    if (Math.abs(movement) < 2) return
+    handle = movement < 0 ? 'min' : 'max'
+    dragState.handle = handle
+  }
+
+  updateUserRatingRangeHandle(handle, getUserRatingFromPointer(event))
+}
+
+function finishUserRatingRangeDrag() {
+  const dragState = userRatingRangeDragState.value
+  userRatingRangeDragState.value = null
+  window.removeEventListener('pointermove', handleUserRatingRangePointerMove)
+  window.removeEventListener('pointerup', finishUserRatingRangeDrag)
+
+  if (
+    dragState &&
+    showUserRatingRange.value &&
+    (dragState.startMin !== userRatingMin.value || dragState.startMax !== userRatingMax.value)
+  ) {
+    resetPageAndLoad()
+  }
+}
+
+function toggleUserRatingRangePopover() {
+  userRatingRangePopoverOpen.value = !userRatingRangePopoverOpen.value
+  if (userRatingRangePopoverOpen.value) ratingRangePopoverOpen.value = false
+}
+
+function handleUserRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEvent) {
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowDown' && event.key !== 'ArrowRight' && event.key !== 'ArrowUp') {
+    return
+  }
+
+  event.preventDefault()
+  const delta = event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 1
+  const nextValue = handle === 'min' ? userRatingMin.value + delta : userRatingMax.value + delta
+  const previousMin = userRatingMin.value
+  const previousMax = userRatingMax.value
+
+  updateUserRatingRangeHandle(handle, nextValue)
+  if (previousMin !== userRatingMin.value || previousMax !== userRatingMax.value) resetPageAndLoad()
 }
 
 function clampRating(value: number) {
@@ -280,6 +457,7 @@ function finishRatingRangeDrag() {
 
 function toggleRatingRangePopover() {
   ratingRangePopoverOpen.value = !ratingRangePopoverOpen.value
+  if (ratingRangePopoverOpen.value) userRatingRangePopoverOpen.value = false
 }
 
 function handleRatingRangeKeydown(handle: RatingRangeHandle, event: KeyboardEvent) {
@@ -338,28 +516,127 @@ function getStatusClass(status: UserStatus | null) {
   return status ? `status-${status.toLowerCase().replaceAll('_', '-')}` : ''
 }
 
-function closeActionMenu() {
+function getStatusDate(item: TvSeasonItem) {
+  if (item.userTvSeasonStatus === 'WATCHED') {
+    return item.userWatchedDate ?? item.userTvSeasonUpdatedAt
+  }
+  return item.userTvSeasonUpdatedAt
+}
+
+function getRatingValue(rating: number | null) {
+  if (rating === null) return 0
+  return Math.max(0, Math.min(5, Math.round(rating)))
+}
+
+function getTodayString() {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate()
+}
+
+function setWatchedDateParts(dateStr: string | null) {
+  const value = dateStr || getTodayString()
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+
+  if (!year || !month || !day || month < 1 || month > 12 || day < 1 || day > getDaysInMonth(year, month)) {
+    setWatchedDateParts(getTodayString())
+    return
+  }
+
+  watchedYear.value = year
+  watchedMonth.value = month
+  watchedDay.value = day
+}
+
+function buildWatchedDateValue() {
+  return [
+    String(watchedYear.value).padStart(4, '0'),
+    String(watchedMonth.value).padStart(2, '0'),
+    String(watchedDay.value).padStart(2, '0')
+  ].join('-')
+}
+
+function openNativeDatePicker(event: MouseEvent) {
+  const picker = (event.currentTarget as HTMLElement).querySelector<HTMLInputElement>('input[type="date"]')
+  if (!picker) return
+
+  if (typeof picker.showPicker === 'function') {
+    picker.showPicker()
+  } else {
+    picker.click()
+  }
+}
+
+function handleNativeDateChange(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  if (value) setWatchedDateParts(value)
+}
+
+function closeActionPanels() {
   activeActionSeasonId.value = null
+  watchedEditorSeasonId.value = null
+  hoveredWatchedRating.value = null
+  ratingRangePopoverOpen.value = false
+  userRatingRangePopoverOpen.value = false
 }
 
 function toggleActionMenu(seasonId: number) {
+  watchedEditorSeasonId.value = null
   activeActionSeasonId.value = activeActionSeasonId.value === seasonId ? null : seasonId
 }
 
-async function markSeason(item: TvSeasonItem, status: UserStatus) {
+function openWatchedEditor(item: TvSeasonItem) {
+  activeActionSeasonId.value = null
+  watchedEditorSeasonId.value = item.id
+  watchedRating.value = item.userRating ?? null
+  hoveredWatchedRating.value = null
+  setWatchedDateParts(item.userWatchedDate)
+}
+
+async function saveSeasonStatus(seasonId: number, data: UserTvSeasonRequest) {
   const token = getToken()
   if (!token) {
     window.location.href = `/login?redirect=${encodeURIComponent('/tv-seasons')}`
     return
   }
-  savingId.value = item.id
+
+  if (savingId.value !== null) return
+  savingId.value = seasonId
+
   try {
-    await saveUserTvSeason(item.id, { status, watchedDate: status === 'WATCHED' ? new Date().toISOString().slice(0, 10) : undefined }, token)
-    closeActionMenu()
+    await saveUserTvSeason(seasonId, data, token)
+    closeActionPanels()
     await loadTvSeasons()
+  } catch (error) {
+    console.error(error)
+    window.alert('保存剧集状态失败，请稍后再试')
   } finally {
     savingId.value = null
   }
+}
+
+async function markSeason(item: TvSeasonItem, status: UserStatus) {
+  if (status === 'WATCHED') {
+    openWatchedEditor(item)
+    return
+  }
+
+  await saveSeasonStatus(item.id, { status })
+}
+
+async function confirmWatchedStatus(seasonId: number) {
+  await saveSeasonStatus(seasonId, {
+    status: 'WATCHED',
+    rating: watchedRating.value,
+    watchedDate: buildWatchedDateValue()
+  })
 }
 
 function goToPage(target: number) {
@@ -380,8 +657,13 @@ watch(keyword, () => {
   searchTimer = window.setTimeout(resetPageAndLoad, 350)
 })
 
+watch([watchedYear, watchedMonth], () => {
+  const maxDay = getDaysInMonth(watchedYear.value, watchedMonth.value)
+  if (watchedDay.value > maxDay) watchedDay.value = maxDay
+})
+
 onMounted(async () => {
-  document.addEventListener('click', closeActionMenu)
+  document.addEventListener('click', closeActionPanels)
   isUserLoggedIn.value = isLoggedIn()
   initYears()
   await loadGenres()
@@ -389,9 +671,11 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('click', closeActionMenu)
+  document.removeEventListener('click', closeActionPanels)
   window.removeEventListener('pointermove', handleRatingRangePointerMove)
   window.removeEventListener('pointerup', finishRatingRangeDrag)
+  window.removeEventListener('pointermove', handleUserRatingRangePointerMove)
+  window.removeEventListener('pointerup', finishUserRatingRangeDrag)
 })
 </script>
 
@@ -432,6 +716,13 @@ onBeforeUnmount(() => {
         <span class="label">年份：</span>
         <div class="options year-options">
           <button class="option" :class="{ active: selectedYear === null }" @click="handleYearClick(null)">全部</button>
+          <!-- <span
+            class="option"
+            :class="{ active: selectedYear === null }"
+            @click="handleYearClick(null)"
+          >
+            全部
+          </span> -->
           <button
             v-for="year in recentYears"
             :key="year"
@@ -453,18 +744,103 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="filter-row">
+      <div v-if="isUserLoggedIn" class="filter-row user-status-filter-row">
         <span class="label">状态：</span>
         <div class="options">
-          <button
+          <template
             v-for="status in statusOptions"
             :key="status.value ?? 'all'"
-            class="option"
-            :class="{ active: selectedStatus.value === status.value }"
-            @click="selectedStatus = status; resetPageAndLoad()"
           >
-            {{ status.name }}
-          </button>
+            <span
+              class="option user-status-option"
+              :class="{
+                active: selectedStatus.value === status.value,
+                'watched-rating-option': showUserRatingRange && status.value === 'WATCHED'
+              }"
+              @click="handleUserStatusOptionClick(status, $event)"
+            >
+              <span>{{ status.name }}</span>
+              <template v-if="showUserRatingRange && status.value === 'WATCHED'">
+                <span class="mobile-status-rating-separator">·</span>
+                <strong class="mobile-status-rating-label">{{ userRatingRangeLabel }}</strong>
+                <span class="rating-filter-arrow mobile-status-rating-arrow"></span>
+              </template>
+            </span>
+
+            <div
+              v-if="showUserRatingRange && status.value === 'WATCHED'"
+              class="rating-filter-inline user-rating-filter"
+              @click.stop
+            >
+              <button
+                type="button"
+                class="rating-filter-trigger"
+                :class="{ active: userRatingRangePopoverOpen || hasUserRatingRangeFilter }"
+                @click="toggleUserRatingRangePopover"
+              >
+                <span>我的评分</span>
+                <strong>{{ userRatingRangeLabel }}</strong>
+                <span class="rating-filter-arrow"></span>
+              </button>
+
+              <div v-if="userRatingRangePopoverOpen" class="rating-range-popover">
+                <div class="rating-range-popover-title">我的评分</div>
+                <div class="rating-range-panel">
+                  <div
+                    :ref="setUserRatingRangeControlRef"
+                    class="rating-range-control"
+                    :style="{
+                      '--range-start': userRatingRangeStart,
+                      '--range-end': userRatingRangeEnd
+                    }"
+                    @pointerdown="startUserRatingRangeDrag"
+                  >
+                    <div class="rating-range-track">
+                      <span
+                        v-for="star in userRatingTickMarks"
+                        :key="star"
+                        class="rating-range-tick"
+                        :style="{ left: getUserRatingPointPosition(star) }"
+                      ></span>
+                    </div>
+                    <div class="rating-range-active"></div>
+                    <button
+                      type="button"
+                      class="rating-range-handle rating-range-handle-min"
+                      :class="{ dragging: userRatingRangeDragState?.handle === 'min' }"
+                      aria-label="最低我的评分"
+                      :aria-valuenow="userRatingMin"
+                      aria-valuemin="1"
+                      aria-valuemax="5"
+                      @pointerdown.stop="startUserRatingRangeDrag($event, 'min')"
+                      @keydown="handleUserRatingRangeKeydown('min', $event)"
+                    ></button>
+                    <button
+                      type="button"
+                      class="rating-range-handle rating-range-handle-max"
+                      :class="{ dragging: userRatingRangeDragState?.handle === 'max' }"
+                      aria-label="最高我的评分"
+                      :aria-valuenow="userRatingMax"
+                      aria-valuemin="1"
+                      aria-valuemax="5"
+                      @pointerdown.stop="startUserRatingRangeDrag($event, 'max')"
+                      @keydown="handleUserRatingRangeKeydown('max', $event)"
+                    ></button>
+                  </div>
+                  <div class="rating-range-labels">
+                    <span
+                      v-for="star in userRatingTickMarks"
+                      :key="star"
+                      :style="getUserRatingLabelStyle(star)"
+                      :class="{ active: star >= userRatingMin && star <= userRatingMax }"
+                    >
+                      {{ star }}星
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -554,12 +930,6 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <template v-if="selectedStatus.value === 'WATCHED' && isUserLoggedIn">
-            <span class="sub-label">我的评分</span>
-            <input v-model.number="userRatingMin" class="number-input" type="number" min="1" max="5" placeholder="最低" @change="resetPageAndLoad" />
-            <span class="range-separator">-</span>
-            <input v-model.number="userRatingMax" class="number-input" type="number" min="1" max="5" placeholder="最高" @change="resetPageAndLoad" />
-          </template>
         </div>
       </div>
 
@@ -580,7 +950,7 @@ onBeforeUnmount(() => {
         v-for="item in tvSeasons"
         :key="item.id"
         class="season-card"
-        :class="{ actionOpen: activeActionSeasonId === item.id }"
+        :class="{ actionOpen: activeActionSeasonId === item.id || watchedEditorSeasonId === item.id }"
       >
         <div class="poster-shell">
           <RouterLink class="poster-link" :to="`/tv-seasons/${item.id}`">
@@ -590,10 +960,26 @@ onBeforeUnmount(() => {
               <div class="episode-badge">{{ item.episodeCount ?? '-' }} 集</div>
               <div
                 v-if="item.userTvSeasonStatus"
-                class="status-ribbon"
+                class="poster-status-overlay"
                 :class="getStatusClass(item.userTvSeasonStatus)"
               >
-                {{ getStatusText(item.userTvSeasonStatus) }}
+                <div v-if="item.userTvSeasonStatus === 'WATCHED'" class="poster-status-stars">
+                  <span
+                    v-for="star in 5"
+                    :key="star"
+                    :class="{ filled: star <= getRatingValue(item.userRating) }"
+                  >
+                    ★
+                  </span>
+                </div>
+                <div class="poster-status-line">
+                  <span class="poster-status-pill">
+                    {{ getStatusText(item.userTvSeasonStatus) }}
+                  </span>
+                  <span v-if="getStatusDate(item)" class="poster-status-date">
+                    {{ formatDate(getStatusDate(item)) }}
+                  </span>
+                </div>
               </div>
             </div>
           </RouterLink>
@@ -602,7 +988,7 @@ onBeforeUnmount(() => {
             v-if="isUserLoggedIn"
             type="button"
             class="poster-action-button"
-            :class="{ active: activeActionSeasonId === item.id }"
+            :class="{ active: activeActionSeasonId === item.id || watchedEditorSeasonId === item.id }"
             aria-label="标记剧集"
             @click.stop="toggleActionMenu(item.id)"
           >
@@ -617,7 +1003,7 @@ onBeforeUnmount(() => {
             @click.stop
           >
             <button type="button" :disabled="savingId === item.id" @click="markSeason(item, 'WANT_TO_WATCH')">
-              <span class="action-icon">+</span>
+              <span class="action-icon">＋</span>
               想看
             </button>
             <button type="button" :disabled="savingId === item.id" @click="markSeason(item, 'WATCHED')">
@@ -625,9 +1011,58 @@ onBeforeUnmount(() => {
               看过
             </button>
             <button type="button" :disabled="savingId === item.id" @click="markSeason(item, 'NOT_INTERESTED')">
-              <span class="action-icon">-</span>
+              <span class="action-icon">－</span>
               不想看
             </button>
+          </div>
+
+          <div
+            v-if="watchedEditorSeasonId === item.id"
+            class="watched-editor-popover"
+            @click.stop
+          >
+            <div class="watched-editor-title">标记看过</div>
+            <div class="watched-editor-field">
+              <span>我的评分</span>
+              <div class="watched-rating-picker" @mouseleave="hoveredWatchedRating = null">
+                <button
+                  v-for="star in 5"
+                  :key="star"
+                  type="button"
+                  :class="{ selected: star <= (hoveredWatchedRating ?? watchedRating ?? 0) }"
+                  @mouseenter="hoveredWatchedRating = star"
+                  @click="watchedRating = star"
+                >
+                  ★
+                </button>
+              </div>
+            </div>
+            <div class="watched-editor-field">
+              <span>看过日期</span>
+              <div class="date-input-shell" @click.stop="openNativeDatePicker">
+                <button type="button" class="date-display-button">
+                  {{ watchedDateDisplay }}
+                </button>
+                <button type="button" class="date-picker-button" aria-label="选择看过日期"></button>
+                <input
+                  class="native-date-input"
+                  type="date"
+                  :value="buildWatchedDateValue()"
+                  @change="handleNativeDateChange"
+                />
+              </div>
+            </div>
+            <div class="watched-editor-actions">
+              <button type="button" class="cancel-btn" @click="closeActionPanels">取消</button>
+              <button
+                type="button"
+                class="save-btn"
+                :disabled="savingId === item.id"
+                @click="confirmWatchedStatus(item.id)"
+              >
+                {{ savingId === item.id ? '保存中' : '保存' }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -667,16 +1102,18 @@ onBeforeUnmount(() => {
 
     <div class="pagination">
       <button :disabled="page === 0" @click="goToPage(page - 1)">上一页</button>
-      <button
+      <span
         v-for="(item, index) in visiblePages"
         :key="`${item}-${index}`"
-        class="page-button"
-        :class="{ active: item === page, ellipsis: item === '...' }"
-        :disabled="item === '...'"
+        class="page-item"
+        :class="{
+          active: typeof item === 'number' && item === page,
+          ellipsis: item === '...'
+        }"
         @click="typeof item === 'number' && goToPage(item)"
       >
         {{ typeof item === 'number' ? item + 1 : item }}
-      </button>
+      </span>
       <button :disabled="page >= totalPages - 1" @click="goToPage(page + 1)">下一页</button>
       <div class="jump-box">
         <span>跳至</span>
@@ -859,6 +1296,12 @@ onBeforeUnmount(() => {
 .rating-filter-trigger strong {
   color: inherit;
   font-weight: 700;
+}
+
+.mobile-status-rating-separator,
+.mobile-status-rating-label,
+.mobile-status-rating-arrow {
+  display: none;
 }
 
 .movie-rating-options {
@@ -1102,31 +1545,79 @@ onBeforeUnmount(() => {
   backdrop-filter: blur(6px);
 }
 
-.status-ribbon {
+.poster-status-overlay {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
-  min-height: 24px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 36px 10px 10px;
+  background: linear-gradient(
+    to top,
+    rgba(17, 24, 39, 0.96),
+    rgba(17, 24, 39, 0.74) 56%,
+    rgba(17, 24, 39, 0)
+  );
+  color: #fff;
+  pointer-events: none;
+}
+
+.poster-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.poster-status-pill {
+  flex-shrink: 0;
+  min-width: 44px;
+  height: 24px;
   padding: 0 10px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
-  background: rgba(17, 24, 39, 0.82);
+  justify-content: center;
   color: #fff;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.status-want-to-watch.status-ribbon {
+.status-want-to-watch .poster-status-pill {
   background: #1677ff;
 }
 
-.status-watched.status-ribbon {
+.status-watched .poster-status-pill {
   background: #22c55e;
 }
 
-.status-not-interested.status-ribbon {
+.status-not-interested .poster-status-pill {
+  min-width: 58px;
   background: #6b7280;
+}
+
+.poster-status-date {
+  min-width: 0;
+  color: #f9fafb;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.poster-status-stars {
+  display: flex;
+  gap: 1px;
+  margin-bottom: 5px;
+  color: #9ca3af;
+  font-size: 16px;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+.poster-status-stars .filled {
+  color: #fbbf24;
 }
 
 .poster-action-button {
@@ -1172,17 +1663,21 @@ onBeforeUnmount(() => {
   background: currentColor;
 }
 
-.season-action-menu {
+.season-action-menu,
+.watched-editor-popover {
   position: absolute;
   top: 42px;
   right: 8px;
   z-index: 5;
-  width: 128px;
   border: 1px solid rgba(229, 231, 235, 0.95);
-  border-radius: 6px;
-  padding: 6px;
   background: #fff;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.season-action-menu {
+  width: 128px;
+  border-radius: 6px;
+  padding: 6px;
 }
 
 .season-action-menu button {
@@ -1218,6 +1713,145 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.watched-editor-popover {
+  width: 220px;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.watched-editor-title {
+  margin-bottom: 10px;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.watched-editor-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #4b5563;
+  font-size: 12px;
+}
+
+.watched-rating-picker {
+  display: flex;
+  gap: 2px;
+}
+
+.watched-rating-picker button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}
+
+.watched-rating-picker button.selected {
+  color: #f5a623;
+}
+
+.date-input-shell {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  width: 100%;
+  height: 32px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.date-input-shell:focus-within {
+  border-color: #1677ff;
+}
+
+.date-display-button,
+.date-picker-button {
+  border: none;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+}
+
+.date-display-button {
+  min-width: 0;
+  padding: 0 8px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.date-picker-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+}
+
+.date-picker-button::before {
+  content: '';
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+
+.date-picker-button::after {
+  content: '';
+  position: absolute;
+  top: 9px;
+  width: 13px;
+  border-top: 2px solid currentColor;
+}
+
+.native-date-input {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.watched-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.watched-editor-actions button {
+  height: 30px;
+  border-radius: 5px;
+  padding: 0 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.cancel-btn {
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  color: #4b5563;
+}
+
+.save-btn {
+  border: 1px solid #1677ff;
+  background: #1677ff;
+  color: #fff;
+}
+
+.save-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .season-meta {
   margin-top: 10px;
   display: flex;
@@ -1232,7 +1866,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   overflow: hidden;
   color: #111;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1.4;
   text-overflow: ellipsis;
@@ -1291,9 +1925,7 @@ onBeforeUnmount(() => {
   margin-top: 8px;
 }
 
-.card-actions button,
-.pagination button,
-.page-button {
+.card-actions button {
   height: 32px;
   border: none;
   border-radius: 6px;
@@ -1310,6 +1942,16 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
+.pagination button {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 6px;
+  background: #1677ff;
+  color: #fff;
+  cursor: pointer;
+}
+
 .pagination {
   display: flex;
   flex-wrap: wrap;
@@ -1317,30 +1959,54 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-.page-button.active {
+.page-item {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.page-item:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.page-item.active {
+  border-color: #1677ff;
   background: #1677ff;
   color: #fff;
 }
 
-.page-button.ellipsis {
+.page-item.ellipsis {
+  border: none;
   background: transparent;
-  color: #9ca3af;
+  color: #999;
+  cursor: default;
 }
 
 .jump-box {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: 8px;
   color: #6b7280;
   font-size: 13px;
 }
 
 .jump-box input {
-  width: 58px;
-  height: 32px;
+  width: 60px;
+  height: 36px;
   border: 1px solid #dcdfe6;
   border-radius: 6px;
   padding: 0 8px;
+  outline: none;
 }
 
 @media (max-width: 1200px) {
@@ -1356,18 +2022,26 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
+  .tv-page {
+    gap: 12px;
+  }
+
   .filter-panel {
     padding: 12px;
+    border-radius: 8px;
   }
 
   .filter-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    margin-bottom: 10px;
   }
 
   .options {
     flex-wrap: nowrap;
     overflow-x: auto;
+    padding-bottom: 2px;
     scrollbar-width: none;
   }
 
@@ -1380,13 +2054,68 @@ onBeforeUnmount(() => {
     white-space: nowrap;
   }
 
-  .compact-options {
+  .filter-row:has(.rating-filter-inline) .options {
     flex-wrap: wrap;
     overflow: visible;
   }
 
+  .filter-row.user-status-filter-row .options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .user-status-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .watched-rating-option {
+    padding-right: 12px;
+  }
+
+  .mobile-status-rating-separator,
+  .mobile-status-rating-label,
+  .mobile-status-rating-arrow {
+    display: inline-flex;
+  }
+
+  .mobile-status-rating-label {
+    color: inherit;
+    font-weight: 700;
+  }
+
+  .mobile-status-rating-arrow {
+    flex: 0 0 auto;
+    margin-left: 1px;
+  }
+
+  .user-rating-filter {
+    width: 0;
+    height: 0;
+    flex: 0 0 0;
+  }
+
+  .user-rating-filter > .rating-filter-trigger {
+    display: none;
+  }
+
+  .movie-rating-filter-row {
+    position: relative;
+  }
+
   .movie-rating-filter {
     position: static;
+  }
+
+  .movie-rating-filter .rating-range-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    width: auto;
+    transform: none;
   }
 
   .rating-range-popover {
@@ -1413,6 +2142,10 @@ onBeforeUnmount(() => {
     width: 100%;
   }
 
+  .rating-range-labels {
+    font-size: 11px;
+  }
+
   .year-options {
     flex-wrap: nowrap;
   }
@@ -1427,13 +2160,134 @@ onBeforeUnmount(() => {
     flex: 0 0 auto;
   }
 
+  .search-options {
+    flex: 1 1 auto;
+    width: 100%;
+    overflow: visible;
+  }
+
   .season-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px 10px;
   }
 
-  .card-actions {
-    grid-template-columns: 1fr;
+  .season-card:hover {
+    transform: none;
+  }
+
+  .poster-wrap {
+    border-radius: 8px;
+  }
+
+  .poster-action-button {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .episode-badge {
+    min-height: 22px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .poster-status-overlay {
+    padding: 30px 8px 8px;
+  }
+
+  .poster-status-line {
+    gap: 6px;
+  }
+
+  .poster-status-pill {
+    min-width: 40px;
+    height: 22px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .status-not-interested .poster-status-pill {
+    min-width: 54px;
+  }
+
+  .poster-status-date {
+    font-size: 12px;
+  }
+
+  .poster-status-stars {
+    margin-bottom: 4px;
+    font-size: 14px;
+  }
+
+  .season-action-menu {
+    width: 120px;
+  }
+
+  .watched-editor-popover {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    right: auto;
+    width: min(300px, calc(100vw - 32px));
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    transform: translate(-50%, -50%);
+    z-index: 80;
+  }
+
+  .season-meta {
+    margin-top: 8px;
+    display: block;
+  }
+
+  .season-title,
+  .season-rating {
+    font-size: 14px;
+  }
+
+  .season-rating {
+    display: inline-flex;
+    margin-top: 2px;
+  }
+
+  .pagination {
+    gap: 6px;
+  }
+
+  .pagination > button:first-child {
+    order: 1;
+    flex: 1 0 calc(50% - 3px);
+  }
+
+  .pagination > button:nth-last-child(2) {
+    order: 2;
+    flex: 1 0 calc(50% - 3px);
+  }
+
+  .page-item {
+    order: 3;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  .pagination button {
+    height: 32px;
+    padding: 0 12px;
+    white-space: nowrap;
+  }
+
+  .jump-box {
+    order: 4;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 380px) {
+  .season-title,
+  .season-rating {
+    font-size: 13px;
   }
 }
 </style>

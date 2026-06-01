@@ -522,7 +522,6 @@ public class MovieService {
                                 collectionMovies.get(index),
                                 index + 1
                         ))
-                        .filter(collectionMovie -> !collectionMovie.getId().equals(movie.getId()))
                         .toList()
         );
     }

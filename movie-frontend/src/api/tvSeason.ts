@@ -52,6 +52,16 @@ export interface GetTvSeasonsParams {
   direction?: string
 }
 
+export interface TvSeasonCollectionItem {
+  id: number
+  seasonNumber: number
+  seasonName: string
+  airDate: string | null
+  voteAverage: number | null
+  imdbVoteAverage: number | null
+  posterPath: string | null
+}
+
 export interface TvSeasonDetail {
   id: number
   tmdbTvId: number
@@ -79,6 +89,7 @@ export interface TvSeasonDetail {
   directors: PersonItem[]
   writers: PersonItem[]
   cast: PersonItem[]
+  collectionSeasons: TvSeasonCollectionItem[]
 }
 
 export async function getTvSeasons(params: GetTvSeasonsParams): Promise<TvSeasonPageResponse> {

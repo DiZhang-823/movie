@@ -389,8 +389,34 @@ public class TvSeasonService {
                 .filter(person -> "Actor".equalsIgnoreCase(person.getJob()))
                 .map(this::convertToPersonItemResponse)
                 .toList());
+        response.setCollectionSeasons(tvSeasonRepository.findByTmdbTvIdOrderBySeasonNumberAsc(tvSeason.getTmdbTvId())
+                .stream()
+                .map(this::convertToCollectionItemResponse)
+                .toList());
 
         return response;
+    }
+
+    private TvSeasonCollectionItemResponse convertToCollectionItemResponse(TvSeason tvSeason) {
+        TvSeasonCollectionItemResponse item = new TvSeasonCollectionItemResponse();
+        item.setId(tvSeason.getId());
+        item.setSeasonNumber(tvSeason.getSeasonNumber());
+        item.setSeasonName(getSeasonName(tvSeason));
+        item.setAirDate(tvSeason.getAirDate());
+        item.setVoteAverage(tvSeason.getVoteAverage());
+        item.setImdbVoteAverage(tvSeason.getImdbVoteAverage());
+        item.setPosterPath(tvSeason.getPosterPath());
+        return item;
+    }
+
+    private String getSeasonName(TvSeason tvSeason) {
+        String title = tvSeason.getTitle();
+        String showName = tvSeason.getShowName();
+        String titlePrefix = showName + " ";
+        if (hasText(title) && hasText(showName) && title.startsWith(titlePrefix)) {
+            return title.substring(titlePrefix.length());
+        }
+        return hasText(title) ? title : "第" + tvSeason.getSeasonNumber() + "季";
     }
 
     private PersonItemResponse convertToPersonItemResponse(TvSeasonPerson tvSeasonPerson) {
