@@ -3,6 +3,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getMovieById, type MovieCollectionItem, type MovieDetail, type PersonItem } from '@/api/movie'
 import { getUserMovie, saveUserMovie, type UserMovieResponse } from '@/api/userMovie'
+import { isLoggedIn } from '@/utils/auth'
 
 type DisplayRatingSource = {
   voteAverage?: number | null
@@ -22,6 +23,7 @@ const castListRef = ref<HTMLElement | null>(null)
 const castListMaxHeight = ref('none')
 
 const userMovie = ref<UserMovieResponse | null>(null)
+const isUserLoggedIn = ref(isLoggedIn())
 
 const showWatchedPanel = ref(false)
 const watchedRating = ref<number | null>(null)
@@ -100,6 +102,7 @@ async function loadMovieDetail() {
 }
 
 async function loadDetailPage() {
+  isUserLoggedIn.value = isLoggedIn()
   visibleCastCount.value = 12
   castListMaxHeight.value = 'none'
   collectionExpanded.value = false
@@ -503,7 +506,7 @@ watch(() => route.params.id, () => {
               </div>
           </div>
 
-          <div class="action-panel">
+          <div v-if="isUserLoggedIn" class="action-panel">
               <div class="hero-actions">
                 <button
                   type="button"

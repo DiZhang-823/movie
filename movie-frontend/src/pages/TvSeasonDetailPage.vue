@@ -4,13 +4,14 @@ import { useRoute } from 'vue-router'
 import { getTvSeasonById, type TvSeasonCollectionItem, type TvSeasonDetail } from '../api/tvSeason'
 import { getUserTvSeason, saveUserTvSeason, type UserTvSeasonResponse } from '../api/userTvSeason'
 import type { PersonItem } from '../api/movie'
-import { getToken } from '../utils/auth'
+import { getToken, isLoggedIn } from '../utils/auth'
 
 type UserStatus = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED'
 
 const route = useRoute()
 const season = ref<TvSeasonDetail | null>(null)
 const userSeason = ref<UserTvSeasonResponse | null>(null)
+const isUserLoggedIn = ref(isLoggedIn())
 const loading = ref(false)
 const errorMessage = ref('')
 const saving = ref(false)
@@ -40,6 +41,7 @@ const heroStyle = computed(() => {
 })
 
 async function loadPage() {
+  isUserLoggedIn.value = isLoggedIn()
   loading.value = true
   errorMessage.value = ''
   userSeason.value = null
@@ -294,7 +296,7 @@ watch(() => route.params.id, () => {
             </div>
           </div>
 
-          <div class="action-panel">
+          <div v-if="isUserLoggedIn" class="action-panel">
             <div class="actions hero-actions">
               <button class="action-btn" :class="{ active: userSeason?.status === 'WANT_TO_WATCH' }" :disabled="saving" @click="markSeason('WANT_TO_WATCH')">想看</button>
               <button class="action-btn watched-action" :class="{ active: userSeason?.status === 'WATCHED' }" :disabled="saving" @click="handleWatched">看过</button>
