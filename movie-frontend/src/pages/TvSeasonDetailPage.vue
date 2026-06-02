@@ -277,35 +277,35 @@ watch(() => route.params.id, () => {
                 IMDb {{ season.imdbParentId }}
               </a>
             </div>
+          </div>
 
-            <div class="score-grid">
-              <div class="score-card">
-                <span class="score-label">评分</span>
-                <strong>{{ formatScore(getDisplayVoteAverage(season)) }}</strong>
-              </div>
-              <div class="score-card">
-                <span class="score-label">评分人数</span>
-                <strong>{{ formatCount(getDisplayVoteCount(season)) }}</strong>
-              </div>
-              <div class="score-card">
-                <span class="score-label">首播</span>
-                <strong class="release-score">{{ formatIsoDate(season.airDate) }}</strong>
-              </div>
+          <div class="score-grid">
+            <div class="score-card">
+              <span class="score-label">评分</span>
+              <strong>{{ formatScore(getDisplayVoteAverage(season)) }}</strong>
             </div>
+            <div class="score-card">
+              <span class="score-label">评分人数</span>
+              <strong>{{ formatCount(getDisplayVoteCount(season)) }}</strong>
+            </div>
+            <div class="score-card">
+              <span class="score-label">首播</span>
+              <strong class="release-score">{{ formatIsoDate(season.airDate) }}</strong>
+            </div>
+          </div>
 
-            <div class="action-panel">
-              <div class="actions hero-actions">
-                <button class="action-btn" :class="{ active: userSeason?.status === 'WANT_TO_WATCH' }" :disabled="saving" @click="markSeason('WANT_TO_WATCH')">想看</button>
-                <button class="action-btn watched-action" :class="{ active: userSeason?.status === 'WATCHED' }" :disabled="saving" @click="handleWatched">看过</button>
-                <button class="action-btn" :class="{ active: userSeason?.status === 'NOT_INTERESTED' }" :disabled="saving" @click="markSeason('NOT_INTERESTED')">不想看</button>
-              </div>
-              <div v-if="userSeason" class="record-pill hero-record" :class="getStatusClass(userSeason.status)">
-                <span>{{ getStatusText(userSeason.status) }}</span>
-                <span v-if="getRecordDate()">{{ getRecordDate() }}</span>
-                <span v-if="userSeason.status === 'WATCHED'" class="record-stars">
-                  <span v-for="star in 5" :key="star" :class="{ filled: star <= getRatingValue(userSeason.rating) }">★</span>
-                </span>
-              </div>
+          <div class="action-panel">
+            <div class="actions hero-actions">
+              <button class="action-btn" :class="{ active: userSeason?.status === 'WANT_TO_WATCH' }" :disabled="saving" @click="markSeason('WANT_TO_WATCH')">想看</button>
+              <button class="action-btn watched-action" :class="{ active: userSeason?.status === 'WATCHED' }" :disabled="saving" @click="handleWatched">看过</button>
+              <button class="action-btn" :class="{ active: userSeason?.status === 'NOT_INTERESTED' }" :disabled="saving" @click="markSeason('NOT_INTERESTED')">不想看</button>
+            </div>
+            <div v-if="userSeason" class="record-pill hero-record" :class="getStatusClass(userSeason.status)">
+              <span>{{ getStatusText(userSeason.status) }}</span>
+              <span v-if="getRecordDate()">{{ getRecordDate() }}</span>
+              <span v-if="userSeason.status === 'WATCHED'" class="record-stars">
+                <span v-for="star in 5" :key="star" :class="{ filled: star <= getRatingValue(userSeason.rating) }">★</span>
+              </span>
             </div>
           </div>
         </div>
@@ -543,6 +543,7 @@ watch(() => route.params.id, () => {
   position: relative;
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
   gap: 0 34px;
   min-height: 460px;
   padding: 44px 44px 40px;
@@ -550,6 +551,7 @@ watch(() => route.params.id, () => {
 }
 
 .poster-box {
+  grid-row: 1 / 4;
   width: 260px;
   align-self: end;
 }
@@ -561,6 +563,16 @@ watch(() => route.params.id, () => {
   border-radius: 8px;
   object-fit: cover;
   box-shadow: 0 22px 48px rgba(0, 0, 0, 0.34);
+}
+
+.hero-main,
+.score-grid,
+.action-panel {
+  grid-column: 2;
+}
+
+.hero-main {
+  min-width: 0;
 }
 
 .poster-placeholder {
@@ -1422,7 +1434,7 @@ watch(() => route.params.id, () => {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 760px) {
   .tv-detail-page {
     gap: 0;
   }
@@ -1462,18 +1474,13 @@ watch(() => route.params.id, () => {
   }
 
   .hero-main {
-    display: contents;
-  }
-
-  .title-row,
-  .original-title,
-  .meta-tags {
     grid-column: 2;
+    grid-row: 1;
     min-width: 0;
+    padding-bottom: 0;
   }
 
   .title-row {
-    grid-row: 1;
     gap: 6px;
   }
 
@@ -1489,14 +1496,12 @@ watch(() => route.params.id, () => {
   }
 
   .original-title {
-    grid-row: 2;
     margin: 4px 0 0;
     color: rgba(255, 255, 255, 0.72);
     font-size: 13px;
   }
 
   .meta-tags {
-    grid-row: 3;
     margin-top: 12px;
     gap: 8px;
     max-height: 105px;
@@ -1520,7 +1525,7 @@ watch(() => route.params.id, () => {
   }
 
   .score-grid {
-    grid-row: 4;
+    grid-row: 2;
     max-width: none;
     margin-top: 16px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1546,7 +1551,7 @@ watch(() => route.params.id, () => {
   }
 
   .action-panel {
-    grid-row: 5;
+    grid-row: 3;
     margin-top: 14px;
     padding: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1563,8 +1568,7 @@ watch(() => route.params.id, () => {
   .actions button {
     width: 100%;
     height: 38px;
-    padding: 0 8px;
-    border-radius: 6px;
+    padding: 0 10px;
     font-size: 14px;
   }
 
