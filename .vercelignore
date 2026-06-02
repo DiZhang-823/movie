@@ -1,0 +1,13 @@
+.git
+.idea
+.vercel
+.env
+.env.*
+data
+mockups
+target
+movie_db*.sql
+*.dump
+movie-frontend/node_modules
+movie-frontend/dist
+movie-frontend/target-run-logs
