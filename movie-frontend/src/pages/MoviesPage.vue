@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, computed, watch } from 'vue'
-import { getMovies, type MovieItem } from '../api/movie'
+import { deleteMovie, getMovies, type MovieItem } from '../api/movie'
 import { getGenres } from '../api/genre'
 import { saveUserMovie, type UserMovieRequest, type UserMovieStatus } from '../api/userMovie'
 import { getToken, isLoggedIn } from '../utils/auth'
+import { request } from '../utils/request'
 
 type UserMovieStatusFilter = 'DEFAULT' | 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
 type MarkedUserMovieStatus = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED'
@@ -81,6 +82,7 @@ const movieRatingMax = ref(10)
 const movieRatingTickMarks = Array.from({ length: 11 }, (_, index) => index)
 const movieRatingLabelMarks = [0, 5, 10]
 const isUserLoggedIn = ref(isLoggedIn())
+const isAdmin = ref(false)
 const ratingRangeControlRef = ref<HTMLElement | null>(null)
 const ratingRangeDragState = ref<RatingRangeDragState | null>(null)
 const ratingRangePopoverOpen = ref(false)
@@ -218,6 +220,27 @@ async function loadMovies() {
     console.error(error)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadAdminStatus() {
+  isAdmin.value = false
+
+  if (!isUserLoggedIn.value) {
+    return
+  }
+
+  try {
+    const response = await request('/users/me')
+    if (!response.ok) {
+      return
+    }
+
+    const data = await response.json()
+    isAdmin.value = Boolean(data.isAdmin)
+  } catch (error) {
+    console.error(error)
+    isAdmin.value = false
   }
 }
 
@@ -783,6 +806,32 @@ async function handleQuickStatus(movie: MovieItem, status: UserMovieStatus) {
   await saveMovieStatus(movie.id, { status })
 }
 
+async function handleDeleteMovie(movie: MovieItem) {
+  if (!isAdmin.value || savingMovieId.value !== null) {
+    return
+  }
+
+  savingMovieId.value = movie.id
+
+  try {
+    await deleteMovie(movie.id)
+    movies.value = movies.value.filter(item => item.id !== movie.id)
+    totalElements.value = Math.max(0, totalElements.value - 1)
+    totalPages.value = Math.ceil(totalElements.value / size.value)
+    closeActionPanels()
+
+    if (movies.value.length === 0 && page.value > 0) {
+      page.value -= 1
+      await loadMovies()
+    }
+  } catch (error) {
+    console.error(error)
+    window.alert('删除电影失败，请稍后再试')
+  } finally {
+    savingMovieId.value = null
+  }
+}
+
 async function confirmWatchedStatus(movieId: number) {
   await saveMovieStatus(movieId, {
     status: 'WATCHED',
@@ -823,6 +872,7 @@ function resetPageAndLoadMovies() {
 onMounted(async () => {
   document.addEventListener('click', closeActionPanels)
   isUserLoggedIn.value = isLoggedIn()
+  await loadAdminStatus()
   await loadGenres()
   initYears()
   await loadMovies()
@@ -1216,6 +1266,16 @@ onBeforeUnmount(() => {
             >
               <span class="action-icon">－</span>
               不想看
+            </button>
+            <button
+              v-if="isAdmin"
+              type="button"
+              class="danger-action"
+              :disabled="savingMovieId === movie.id"
+              @click="handleDeleteMovie(movie)"
+            >
+              <span class="action-icon">×</span>
+              删除
             </button>
           </div>
 
@@ -1889,6 +1949,15 @@ onBeforeUnmount(() => {
 .movie-action-menu button:hover {
   background: #eef5ff;
   color: #1677ff;
+}
+
+.movie-action-menu button.danger-action {
+  color: #dc2626;
+}
+
+.movie-action-menu button.danger-action:hover {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .movie-action-menu button:disabled {

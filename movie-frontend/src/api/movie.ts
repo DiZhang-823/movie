@@ -156,3 +156,13 @@ export async function getMovieById(id: number): Promise<MovieDetail> {
 
     return response.json()
 }
+
+export async function deleteMovie(id: number): Promise<void> {
+    const response = await request(`/admin/movies/${id}`, {
+        method: 'DELETE'
+    })
+
+    if (!response.ok) {
+        throw new Error('删除电影失败')
+    }
+}

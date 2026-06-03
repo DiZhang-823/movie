@@ -200,6 +200,18 @@ public class TvSeasonService {
     }
 
     @Transactional
+    public void deleteTvSeason(Long id) {
+        TvSeason tvSeason = tvSeasonRepository.findDetailById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("TV season not found with id:" + id));
+
+        userTvSeasonRepository.deleteByTvSeason(tvSeason);
+        tvSeasonPersonRepository.deleteByTvSeason(tvSeason);
+        tvSeason.getGenres().clear();
+        tvSeason.getCountries().clear();
+        tvSeasonRepository.delete(tvSeason);
+    }
+
+    @Transactional
     public TvSeason syncTvSeason(Long tvId, Integer seasonNumber) {
         TmdbTvShowResponse tvShow = tmdbClient.getTvShowById(tvId);
         TmdbTvSeasonResponse tmdbSeason = tmdbClient.getTvSeasonByNumber(tvId, seasonNumber);

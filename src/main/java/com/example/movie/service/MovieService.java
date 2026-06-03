@@ -400,12 +400,18 @@ public class MovieService {
                 .collect(Collectors.toMap(userMovie -> userMovie.getMovie().getId(), Function.identity()));
     }
 
-//    public void deleteMovie(Long id) {
-//        Movie movie = movieRepository.findById(id)
-//                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
-//
-//        movieRepository.delete(movie);
-//    }
+    @Transactional
+    public void deleteMovie(Long id) {
+        Movie movie = movieRepository.findDetailById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
+
+        userMovieRepository.deleteByMovie(movie);
+        moviePersonRepository.deleteByMovie(movie);
+        movie.getGenres().clear();
+        movie.getCompanies().clear();
+        movie.getCountries().clear();
+        movieRepository.delete(movie);
+    }
 
 //    public MovieResponse updateMovie(Long id, MovieRequest request) {
 //        Movie movie = movieRepository.findById(id)

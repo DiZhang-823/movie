@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getGenres } from '../api/genre'
-import { getTvSeasons, type TvSeasonItem } from '../api/tvSeason'
+import { deleteTvSeason, getTvSeasons, type TvSeasonItem } from '../api/tvSeason'
 import { saveUserTvSeason, type UserTvSeasonRequest } from '../api/userTvSeason'
 import { getToken, isLoggedIn } from '../utils/auth'
+import { request } from '../utils/request'
 
 type UserStatusFilter = 'DEFAULT' | 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED' | 'UNMARKED'
 type UserStatus = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED'
@@ -52,6 +53,7 @@ const userRatingRangeControlRef = ref<HTMLElement | null>(null)
 const userRatingRangeDragState = ref<RatingRangeDragState | null>(null)
 const userRatingRangePopoverOpen = ref(false)
 const isUserLoggedIn = ref(isLoggedIn())
+const isAdmin = ref(false)
 
 const sortOptions = [
   { sortBy: 'CREATED_AT', direction: 'desc', name: '默认' },
@@ -171,6 +173,27 @@ async function loadTvSeasons() {
     errorMessage.value = '加载剧集失败'
   } finally {
     loading.value = false
+  }
+}
+
+async function loadAdminStatus() {
+  isAdmin.value = false
+
+  if (!isUserLoggedIn.value) {
+    return
+  }
+
+  try {
+    const response = await request('/users/me')
+    if (!response.ok) {
+      return
+    }
+
+    const data = await response.json()
+    isAdmin.value = Boolean(data.isAdmin)
+  } catch (error) {
+    console.error(error)
+    isAdmin.value = false
   }
 }
 
@@ -631,6 +654,32 @@ async function markSeason(item: TvSeasonItem, status: UserStatus) {
   await saveSeasonStatus(item.id, { status })
 }
 
+async function handleDeleteSeason(item: TvSeasonItem) {
+  if (!isAdmin.value || savingId.value !== null) {
+    return
+  }
+
+  savingId.value = item.id
+
+  try {
+    await deleteTvSeason(item.id)
+    tvSeasons.value = tvSeasons.value.filter(season => season.id !== item.id)
+    totalElements.value = Math.max(0, totalElements.value - 1)
+    totalPages.value = Math.ceil(totalElements.value / size.value)
+    closeActionPanels()
+
+    if (tvSeasons.value.length === 0 && page.value > 0) {
+      page.value -= 1
+      await loadTvSeasons()
+    }
+  } catch (error) {
+    console.error(error)
+    window.alert('删除剧集失败，请稍后再试')
+  } finally {
+    savingId.value = null
+  }
+}
+
 async function confirmWatchedStatus(seasonId: number) {
   await saveSeasonStatus(seasonId, {
     status: 'WATCHED',
@@ -665,6 +714,7 @@ watch([watchedYear, watchedMonth], () => {
 onMounted(async () => {
   document.addEventListener('click', closeActionPanels)
   isUserLoggedIn.value = isLoggedIn()
+  await loadAdminStatus()
   initYears()
   await loadGenres()
   await loadTvSeasons()
@@ -1013,6 +1063,16 @@ onBeforeUnmount(() => {
             <button type="button" :disabled="savingId === item.id" @click="markSeason(item, 'NOT_INTERESTED')">
               <span class="action-icon">－</span>
               不想看
+            </button>
+            <button
+              v-if="isAdmin"
+              type="button"
+              class="danger-action"
+              :disabled="savingId === item.id"
+              @click="handleDeleteSeason(item)"
+            >
+              <span class="action-icon">×</span>
+              删除
             </button>
           </div>
 
@@ -1699,6 +1759,15 @@ onBeforeUnmount(() => {
 .season-action-menu button:hover {
   background: #eef5ff;
   color: #1677ff;
+}
+
+.season-action-menu button.danger-action {
+  color: #dc2626;
+}
+
+.season-action-menu button.danger-action:hover {
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .season-action-menu button:disabled {

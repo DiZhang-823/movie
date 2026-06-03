@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface UserTvSeasonRepository extends JpaRepository<UserTvSeason, Long> {
     Optional<UserTvSeason> findByUserAndTvSeason(User user, TvSeason tvSeason);
 
+    void deleteByTvSeason(TvSeason tvSeason);
+
     @Query("""
             SELECT uts FROM UserTvSeason uts
             JOIN FETCH uts.tvSeason

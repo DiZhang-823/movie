@@ -128,3 +128,13 @@ export async function getTvSeasonById(id: number): Promise<TvSeasonDetail> {
 
   return response.json()
 }
+
+export async function deleteTvSeason(id: number): Promise<void> {
+  const response = await request(`/admin/tv-seasons/${id}`, {
+    method: 'DELETE'
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to delete TV season')
+  }
+}

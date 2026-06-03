@@ -14,6 +14,8 @@ public interface UserMovieRepository extends JpaRepository<UserMovie, Long> {
 
     Optional<UserMovie> findByUserAndMovie(User user, Movie movie);
 
+    void deleteByMovie(Movie movie);
+
     @Query("""
             SELECT um FROM UserMovie um
             JOIN FETCH um.movie
