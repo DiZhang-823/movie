@@ -1003,7 +1003,7 @@ onBeforeUnmount(() => {
         :class="{ actionOpen: activeActionSeasonId === item.id || watchedEditorSeasonId === item.id }"
       >
         <div class="poster-shell">
-          <RouterLink class="poster-link" :to="`/tv-seasons/${item.id}`">
+          <a class="poster-link" :href="`/tv-seasons/${item.id}`" target="_blank" rel="noopener noreferrer">
             <div class="poster-wrap">
               <img v-if="item.posterPath" :src="getPosterUrl(item.posterPath)" :alt="getDisplayTitle(item)" />
               <div v-else class="poster-placeholder">{{ getDisplayTitle(item).slice(0, 1) }}</div>
@@ -1032,7 +1032,7 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             </div>
-          </RouterLink>
+          </a>
 
           <button
             v-if="isUserLoggedIn"
@@ -1126,19 +1126,19 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <RouterLink class="season-info-link" :to="`/tv-seasons/${item.id}`">
+        <a class="season-info-link" :href="`/tv-seasons/${item.id}`" target="_blank" rel="noopener noreferrer">
           <div class="season-meta">
             <div class="season-title">
               {{ getDisplayTitle(item) }}<span v-if="item.year"> ({{ item.year }})</span>
             </div>
             <div class="season-rating">{{ formatScore(getDisplayVoteAverage(item)) }}</div>
           </div>
-        </RouterLink>
+        </a>
 
         <div class="card-body">
-          <RouterLink class="title-link" :to="`/tv-seasons/${item.id}`">
+          <a class="title-link" :href="`/tv-seasons/${item.id}`" target="_blank" rel="noopener noreferrer">
             <h2>{{ item.title }}</h2>
-          </RouterLink>
+          </a>
           <p>{{ item.originalTitle || item.originalShowName || '原名未知' }}</p>
           <div class="meta-line">
             <span>{{ item.year || '年份未知' }}</span>
