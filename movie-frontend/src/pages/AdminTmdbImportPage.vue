@@ -4,6 +4,7 @@ import {
   fetchImdbRatingsSyncStatus,
   fetchTmdbImportStatus,
   fetchTmdbTvSeasonImportStatus,
+  fetchTvSeasonImdbRatingsSyncStatus,
   runTmdbImportBatch,
   runTmdbTvSeasonImportBatch,
   setTmdbImportEnabled,
@@ -12,6 +13,8 @@ import {
   setTmdbTvSeasonImportInterval,
   syncImdbRatings,
   syncMissingImdbRatings,
+  syncMissingTvSeasonImdbRatings,
+  syncTvSeasonImdbRatings,
   type ImdbRatingsSyncStatus,
   type ImdbRatingsSyncResult,
   type TmdbImportStatus
@@ -27,6 +30,7 @@ const savingTvSeasonInterval = ref(false)
 const running = ref(false)
 const tvSeasonRunning = ref(false)
 const imdbSyncing = ref(false)
+const tvSeasonImdbSyncing = ref(false)
 const tmdbId = ref<number | null>(null)
 const tvSeasonTmdbId = ref<number | null>(null)
 const importCount = ref(1)
@@ -35,9 +39,12 @@ const intervalSeconds = ref<number | null>(null)
 const tvSeasonIntervalSeconds = ref<number | null>(null)
 const imdbSyncResult = ref<ImdbRatingsSyncResult | null>(null)
 const imdbSyncStatus = ref<ImdbRatingsSyncStatus | null>(null)
+const tvSeasonImdbSyncResult = ref<ImdbRatingsSyncResult | null>(null)
+const tvSeasonImdbSyncStatus = ref<ImdbRatingsSyncStatus | null>(null)
 const message = ref('')
 const errorMessage = ref('')
 let imdbSyncPollTimer: number | undefined
+let tvSeasonImdbSyncPollTimer: number | undefined
 
 const statusText = computed(() => {
   if (!status.value) {
@@ -54,6 +61,7 @@ const tvSeasonStatusText = computed(() => {
 })
 
 const imdbSyncRunning = computed(() => imdbSyncing.value || imdbSyncStatus.value?.syncing === true)
+const tvSeasonImdbSyncRunning = computed(() => tvSeasonImdbSyncing.value || tvSeasonImdbSyncStatus.value?.syncing === true)
 
 async function loadStatus() {
   loading.value = true
@@ -108,11 +116,29 @@ async function loadImdbSyncStatus() {
   }
 }
 
+async function loadTvSeasonImdbSyncStatus() {
+  try {
+    const nextStatus = await fetchTvSeasonImdbRatingsSyncStatus()
+    tvSeasonImdbSyncStatus.value = nextStatus
+    if (nextStatus.lastResult) {
+      tvSeasonImdbSyncResult.value = nextStatus.lastResult
+    }
+    if (nextStatus.syncing) {
+      startTvSeasonImdbSyncPolling()
+    }
+    return nextStatus
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+
 async function refreshStatus() {
   await Promise.all([
     loadStatus(),
     loadTvSeasonStatus(),
-    loadImdbSyncStatus()
+    loadImdbSyncStatus(),
+    loadTvSeasonImdbSyncStatus()
   ])
 }
 
@@ -306,9 +332,40 @@ async function runImdbSync(missingOnly = false) {
   }
 }
 
+async function runTvSeasonImdbSync(missingOnly = false) {
+  tvSeasonImdbSyncing.value = true
+  tvSeasonImdbSyncResult.value = null
+  message.value = ''
+  errorMessage.value = ''
+
+  try {
+    const nextStatus = missingOnly ? await syncMissingTvSeasonImdbRatings() : await syncTvSeasonImdbRatings()
+    tvSeasonImdbSyncStatus.value = nextStatus
+    if (nextStatus.lastResult) {
+      tvSeasonImdbSyncResult.value = nextStatus.lastResult
+    }
+    message.value = nextStatus.syncing
+      ? (missingOnly ? '剧集待补 IMDb 评分同步已开始，页面会自动刷新结果' : '剧集 IMDb 评分同步已开始，页面会自动刷新结果')
+      : buildTvSeasonImdbSyncSuccessMessage(nextStatus.lastResult)
+    if (nextStatus.syncing) {
+      startTvSeasonImdbSyncPolling()
+    }
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '剧集 IMDb 评分同步失败，请稍后重试或查看后端日志'
+  } finally {
+    tvSeasonImdbSyncing.value = false
+  }
+}
+
 function startImdbSyncPolling() {
   stopImdbSyncPolling()
   imdbSyncPollTimer = window.setTimeout(pollImdbSyncStatus, 3000)
+}
+
+function startTvSeasonImdbSyncPolling() {
+  stopTvSeasonImdbSyncPolling()
+  tvSeasonImdbSyncPollTimer = window.setTimeout(pollTvSeasonImdbSyncStatus, 3000)
 }
 
 async function pollImdbSyncStatus() {
@@ -332,10 +389,38 @@ async function pollImdbSyncStatus() {
   message.value = buildImdbSyncSuccessMessage(nextStatus.lastResult)
 }
 
+async function pollTvSeasonImdbSyncStatus() {
+  const nextStatus = await loadTvSeasonImdbSyncStatus()
+  if (!nextStatus) {
+    startTvSeasonImdbSyncPolling()
+    return
+  }
+
+  if (nextStatus.syncing) {
+    startTvSeasonImdbSyncPolling()
+    return
+  }
+
+  stopTvSeasonImdbSyncPolling()
+  if (nextStatus.lastErrorMessage) {
+    errorMessage.value = `剧集 IMDb 评分同步失败：${nextStatus.lastErrorMessage}`
+    return
+  }
+
+  message.value = buildTvSeasonImdbSyncSuccessMessage(nextStatus.lastResult)
+}
+
 function stopImdbSyncPolling() {
   if (imdbSyncPollTimer !== undefined) {
     window.clearTimeout(imdbSyncPollTimer)
     imdbSyncPollTimer = undefined
+  }
+}
+
+function stopTvSeasonImdbSyncPolling() {
+  if (tvSeasonImdbSyncPollTimer !== undefined) {
+    window.clearTimeout(tvSeasonImdbSyncPollTimer)
+    tvSeasonImdbSyncPollTimer = undefined
   }
 }
 
@@ -345,6 +430,14 @@ function buildImdbSyncSuccessMessage(result?: ImdbRatingsSyncResult | null) {
   }
   const targetText = result.missingOnly ? '本次待补 IMDb 评分的电影' : '本地有 IMDb ID 的电影'
   return `IMDb 评分同步完成：${targetText} ${result.moviesWithImdbId} 部，匹配 ${result.matchedMovies} 部，更新 ${result.updatedMovies} 部`
+}
+
+function buildTvSeasonImdbSyncSuccessMessage(result?: ImdbRatingsSyncResult | null) {
+  if (!result) {
+    return '剧集 IMDb 评分同步完成'
+  }
+  const targetText = result.missingOnly ? '本次待补 IMDb 评分的剧集季' : '本地有 IMDb 父级 ID 的剧集季'
+  return `剧集 IMDb 评分同步完成：${targetText} ${result.moviesWithImdbId} 个，匹配 ${result.matchedMovies} 个，更新 ${result.updatedMovies} 个`
 }
 
 function formatDateTime(value?: string | null) {
@@ -394,6 +487,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopImdbSyncPolling()
+  stopTvSeasonImdbSyncPolling()
 })
 </script>
 
@@ -578,6 +672,65 @@ onBeforeUnmount(() => {
         <div class="status-item">
           <span>完成时间</span>
           <strong>{{ formatDateTime(imdbSyncResult.finishedAt) }}</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h2>手动同步剧集 IMDb 评分</h2>
+          <p>点击后会下载 IMDb 官方单集和评分数据集，并按每一季的单集平均分和评分人数总和更新剧集 IMDb 评分。</p>
+        </div>
+        <div class="imdb-sync-actions">
+          <button class="secondary-btn" :disabled="tvSeasonImdbSyncRunning" @click="runTvSeasonImdbSync(true)">
+            {{ tvSeasonImdbSyncRunning ? '同步中' : '只同步待补' }}
+          </button>
+          <button class="primary-btn" :disabled="tvSeasonImdbSyncRunning" @click="runTvSeasonImdbSync()">
+            {{ tvSeasonImdbSyncRunning ? '同步中' : '全量同步' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="imdb-status-row">
+        <div class="status-item">
+          <span>上次同步时间</span>
+          <strong>{{ formatDateTime(tvSeasonImdbSyncStatus?.lastSyncedAt) }}</strong>
+        </div>
+        <div v-if="tvSeasonImdbSyncStatus?.syncing" class="status-item">
+          <span>当前同步开始</span>
+          <strong>{{ formatDateTime(tvSeasonImdbSyncStatus.currentStartedAt) }}</strong>
+        </div>
+        <div class="status-item">
+          <span>待补 IMDb 评分</span>
+          <strong>{{ formatNumber(tvSeasonImdbSyncStatus?.missingRatingCount) }}</strong>
+        </div>
+      </div>
+
+      <div v-if="tvSeasonImdbSyncResult" class="result-grid">
+        <div class="status-item">
+          <span>{{ tvSeasonImdbSyncResult.missingOnly ? '本次待补 IMDb 评分' : '本地 IMDb 父级 ID' }}</span>
+          <strong>{{ tvSeasonImdbSyncResult.moviesWithImdbId }}</strong>
+        </div>
+        <div class="status-item">
+          <span>评分数据集总行数</span>
+          <strong>{{ tvSeasonImdbSyncResult.totalRatingsRows }}</strong>
+        </div>
+        <div class="status-item">
+          <span>匹配剧集季</span>
+          <strong>{{ tvSeasonImdbSyncResult.matchedMovies }}</strong>
+        </div>
+        <div class="status-item">
+          <span>已更新</span>
+          <strong>{{ tvSeasonImdbSyncResult.updatedMovies }}</strong>
+        </div>
+        <div class="status-item">
+          <span>未匹配</span>
+          <strong>{{ tvSeasonImdbSyncResult.missingMovies }}</strong>
+        </div>
+        <div class="status-item">
+          <span>完成时间</span>
+          <strong>{{ formatDateTime(tvSeasonImdbSyncResult.finishedAt) }}</strong>
         </div>
       </div>
     </section>

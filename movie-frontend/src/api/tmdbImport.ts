@@ -148,6 +148,14 @@ export async function fetchImdbRatingsSyncStatus(): Promise<ImdbRatingsSyncStatu
     return await response.json()
 }
 
+export async function fetchTvSeasonImdbRatingsSyncStatus(): Promise<ImdbRatingsSyncStatus> {
+    const response = await request('/admin/imdb-ratings/tv-seasons/status')
+    if (!response.ok) {
+        throw new Error('Failed to load TV season IMDb rating sync status')
+    }
+    return await response.json()
+}
+
 export async function syncImdbRatings(): Promise<ImdbRatingsSyncStatus> {
     const response = await request('/admin/imdb-ratings/sync', {
         method: 'POST'
@@ -166,6 +174,28 @@ export async function syncMissingImdbRatings(): Promise<ImdbRatingsSyncStatus> {
     if (!response.ok) {
         const text = await response.text()
         throw new Error(text || 'Failed to sync missing IMDb ratings')
+    }
+    return await response.json()
+}
+
+export async function syncTvSeasonImdbRatings(): Promise<ImdbRatingsSyncStatus> {
+    const response = await request('/admin/imdb-ratings/tv-seasons/sync', {
+        method: 'POST'
+    })
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Failed to sync TV season IMDb ratings')
+    }
+    return await response.json()
+}
+
+export async function syncMissingTvSeasonImdbRatings(): Promise<ImdbRatingsSyncStatus> {
+    const response = await request('/admin/imdb-ratings/tv-seasons/sync-missing', {
+        method: 'POST'
+    })
+    if (!response.ok) {
+        const text = await response.text()
+        throw new Error(text || 'Failed to sync missing TV season IMDb ratings')
     }
     return await response.json()
 }
