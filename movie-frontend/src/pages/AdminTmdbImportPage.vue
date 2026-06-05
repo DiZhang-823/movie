@@ -493,350 +493,510 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="admin-page">
-    <section class="panel">
-      <div class="panel-header">
+    <div class="admin-shell">
+      <header class="admin-header">
         <div>
           <h1>后台管理</h1>
-          <p>管理 TMDB 电影导入任务，也可以手动同步 IMDb 评分和评分人数。</p>
+          <p>管理 TMDB 导入任务和 IMDb 评分同步。</p>
         </div>
         <button class="refresh-btn" :disabled="loading" @click="refreshStatus">
           {{ loading ? '刷新中' : '刷新' }}
         </button>
-      </div>
+      </header>
 
-      <div class="status-grid">
-        <div class="status-item">
-          <span>定时任务</span>
-          <strong :class="{ paused: !status?.enabled }">{{ statusText }}</strong>
-        </div>
-        <div class="status-item">
-          <span>下一次自动导入 ID</span>
-          <strong>{{ status?.nextTmdbId ?? '-' }}</strong>
-        </div>
-        <div class="status-item">
-          <span>导入间隔</span>
-          <strong>{{ status?.intervalSeconds ?? '-' }} 秒</strong>
-        </div>
-        <div class="status-item">
-          <span>最近更新时间</span>
-          <strong>{{ formatDateTime(status?.updatedAt) }}</strong>
-        </div>
-      </div>
+      <div v-if="message" class="message success">{{ message }}</div>
+      <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
 
-      <div class="actions">
-        <button class="primary-btn" :class="{ danger: status?.enabled }" :disabled="!status || switching"
-          @click="toggleImport">
-          {{ status?.enabled ? '暂停定时任务' : '开启定时任务' }}
-        </button>
-        <label class="form-field interval-field">
-          <span>间隔时长（秒）</span>
-          <input v-model.number="intervalSeconds" type="number" min="1" max="86400" placeholder="例如 10" />
-        </label>
-        <button class="secondary-btn" :disabled="!status || savingInterval" @click="saveInterval">
-          {{ savingInterval ? '保存中' : '保存间隔' }}
-        </button>
-      </div>
-    </section>
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>自动导入任务</h2>
+          <p>控制电影和剧集的 TMDB 定时导入状态。</p>
+        </div>
 
-    <section class="panel">
-      <div class="panel-header">
-        <div>
-          <h2>TMDB 剧集定时导入</h2>
-          <p>按 TMDB 剧集 ID 从小到大自动导入，每个剧集 ID 会导入该剧所有正式季。</p>
-        </div>
-      </div>
+        <div class="task-grid">
+          <article class="task-card">
+            <div class="task-card-header">
+              <div>
+                <span class="task-kicker">TMDB</span>
+                <h3>电影自动导入</h3>
+              </div>
+              <span class="status-badge" :class="{ paused: !status?.enabled }">{{ statusText }}</span>
+            </div>
 
-      <div class="status-grid">
-        <div class="status-item">
-          <span>定时任务</span>
-          <strong :class="{ paused: !tvSeasonStatus?.enabled }">{{ tvSeasonStatusText }}</strong>
-        </div>
-        <div class="status-item">
-          <span>下一次自动导入剧集 ID</span>
-          <strong>{{ tvSeasonStatus?.nextTmdbId ?? '-' }}</strong>
-        </div>
-        <div class="status-item">
-          <span>导入间隔</span>
-          <strong>{{ tvSeasonStatus?.intervalSeconds ?? '-' }} 秒</strong>
-        </div>
-        <div class="status-item">
-          <span>最近更新时间</span>
-          <strong>{{ formatDateTime(tvSeasonStatus?.updatedAt) }}</strong>
-        </div>
-      </div>
+            <div class="primary-metric">
+              <span>下一次自动导入 ID</span>
+              <strong>{{ status?.nextTmdbId ?? '-' }}</strong>
+            </div>
 
-      <div class="actions">
-        <button class="primary-btn" :class="{ danger: tvSeasonStatus?.enabled }"
-          :disabled="!tvSeasonStatus || tvSeasonSwitching" @click="toggleTvSeasonImport">
-          {{ tvSeasonStatus?.enabled ? '暂停剧集定时任务' : '开启剧集定时任务' }}
-        </button>
-        <label class="form-field interval-field">
-          <span>间隔时长（秒）</span>
-          <input v-model.number="tvSeasonIntervalSeconds" type="number" min="1" max="86400" placeholder="例如 300" />
-        </label>
-        <button class="secondary-btn" :disabled="!tvSeasonStatus || savingTvSeasonInterval"
-          @click="saveTvSeasonInterval">
-          {{ savingTvSeasonInterval ? '保存中' : '保存间隔' }}
-        </button>
-      </div>
-    </section>
+            <div class="info-grid">
+              <div class="info-item">
+                <span>导入间隔</span>
+                <strong>{{ status?.intervalSeconds ?? '-' }} 秒</strong>
+              </div>
+              <div class="info-item">
+                <span>最近更新时间</span>
+                <strong>{{ formatDateTime(status?.updatedAt) }}</strong>
+              </div>
+            </div>
 
-    <section class="panel">
-      <h2>手动批量导入 TMDB 剧集</h2>
-      <p>从输入的 TMDB 剧集 ID 开始，按 ID 递增导入指定次数；每个 ID 会导入全部正式季。</p>
-      <div class="run-form">
-        <label class="form-field">
-          <span>起始 TMDB 剧集 ID</span>
-          <input v-model.number="tvSeasonTmdbId" type="number" min="1" placeholder="输入 TMDB 剧集 ID" />
-        </label>
-        <label class="form-field count-field">
-          <span>导入次数</span>
-          <input v-model.number="tvSeasonImportCount" type="number" min="1" placeholder="1" />
-        </label>
-        <button class="primary-btn" :disabled="tvSeasonRunning" @click="runTvSeasonBatch">
-          {{ tvSeasonRunning ? '导入中' : '立即导入' }}
-        </button>
-      </div>
-    </section>
+            <div class="task-actions">
+              <button class="primary-btn" :class="{ danger: status?.enabled }" :disabled="!status || switching"
+                @click="toggleImport">
+                {{ status?.enabled ? '暂停定时任务' : '开启定时任务' }}
+              </button>
+              <label class="form-field interval-field">
+                <span>间隔时长（秒）</span>
+                <input v-model.number="intervalSeconds" type="number" min="1" max="86400" placeholder="例如 10" />
+              </label>
+              <button class="secondary-btn" :disabled="!status || savingInterval" @click="saveInterval">
+                {{ savingInterval ? '保存中' : '保存间隔' }}
+              </button>
+            </div>
+          </article>
 
-    <section class="panel">
-      <h2>手动批量导入 TMDB 电影</h2>
-      <p>从输入的 TMDB ID 开始，按 ID 递增导入指定次数。导入次数默认 1。</p>
-      <div class="run-form">
-        <label class="form-field">
-          <span>起始 TMDB ID</span>
-          <input v-model.number="tmdbId" type="number" min="1" placeholder="输入 TMDB ID" />
-        </label>
-        <label class="form-field count-field">
-          <span>导入次数</span>
-          <input v-model.number="importCount" type="number" min="1" placeholder="1" />
-        </label>
-        <button class="primary-btn" :disabled="running" @click="runBatch">
-          {{ running ? '导入中' : '立即导入' }}
-        </button>
-      </div>
-    </section>
+          <article class="task-card">
+            <div class="task-card-header">
+              <div>
+                <span class="task-kicker">TMDB</span>
+                <h3>剧集自动导入</h3>
+              </div>
+              <span class="status-badge" :class="{ paused: !tvSeasonStatus?.enabled }">{{ tvSeasonStatusText }}</span>
+            </div>
 
-    <section class="panel">
-      <div class="panel-header">
-        <div>
-          <h2>手动同步 IMDb 评分</h2>
-          <p>点击后会下载 IMDb 官方评分数据集，并用电影表里的 IMDb ID 更新 IMDb 评分和评分人数。</p>
-        </div>
-        <div class="imdb-sync-actions">
-          <button class="secondary-btn" :disabled="imdbSyncRunning" @click="runImdbSync(true)">
-            {{ imdbSyncRunning ? '同步中' : '只同步待补' }}
-          </button>
-          <button class="primary-btn" :disabled="imdbSyncRunning" @click="runImdbSync()">
-            {{ imdbSyncRunning ? '同步中' : '全量同步' }}
-          </button>
-        </div>
-      </div>
+            <div class="primary-metric">
+              <span>下一次自动导入剧集 ID</span>
+              <strong>{{ tvSeasonStatus?.nextTmdbId ?? '-' }}</strong>
+            </div>
 
-      <div class="imdb-status-row">
-        <div class="status-item">
-          <span>上次同步时间</span>
-          <strong>{{ formatDateTime(imdbSyncStatus?.lastSyncedAt) }}</strong>
-        </div>
-        <div v-if="imdbSyncStatus?.syncing" class="status-item">
-          <span>当前同步开始</span>
-          <strong>{{ formatDateTime(imdbSyncStatus.currentStartedAt) }}</strong>
-        </div>
-        <div class="status-item">
-          <span>待补 IMDb 评分</span>
-          <strong>{{ formatNumber(imdbSyncStatus?.missingRatingCount) }}</strong>
-        </div>
-      </div>
+            <div class="info-grid">
+              <div class="info-item">
+                <span>导入间隔</span>
+                <strong>{{ tvSeasonStatus?.intervalSeconds ?? '-' }} 秒</strong>
+              </div>
+              <div class="info-item">
+                <span>最近更新时间</span>
+                <strong>{{ formatDateTime(tvSeasonStatus?.updatedAt) }}</strong>
+              </div>
+            </div>
 
-      <div v-if="imdbSyncResult" class="result-grid">
-        <div class="status-item">
-          <span>{{ imdbSyncResult.missingOnly ? '本次待补 IMDb 评分' : '本地 IMDb ID' }}</span>
-          <strong>{{ imdbSyncResult.moviesWithImdbId }}</strong>
+            <div class="task-actions">
+              <button class="primary-btn" :class="{ danger: tvSeasonStatus?.enabled }"
+                :disabled="!tvSeasonStatus || tvSeasonSwitching" @click="toggleTvSeasonImport">
+                {{ tvSeasonStatus?.enabled ? '暂停剧集定时任务' : '开启剧集定时任务' }}
+              </button>
+              <label class="form-field interval-field">
+                <span>间隔时长（秒）</span>
+                <input v-model.number="tvSeasonIntervalSeconds" type="number" min="1" max="86400" placeholder="例如 300" />
+              </label>
+              <button class="secondary-btn" :disabled="!tvSeasonStatus || savingTvSeasonInterval"
+                @click="saveTvSeasonInterval">
+                {{ savingTvSeasonInterval ? '保存中' : '保存间隔' }}
+              </button>
+            </div>
+          </article>
         </div>
-        <div class="status-item">
-          <span>数据集总行数</span>
-          <strong>{{ imdbSyncResult.totalRatingsRows }}</strong>
-        </div>
-        <div class="status-item">
-          <span>匹配电影</span>
-          <strong>{{ imdbSyncResult.matchedMovies }}</strong>
-        </div>
-        <div class="status-item">
-          <span>已更新</span>
-          <strong>{{ imdbSyncResult.updatedMovies }}</strong>
-        </div>
-        <div class="status-item">
-          <span>未匹配</span>
-          <strong>{{ imdbSyncResult.missingMovies }}</strong>
-        </div>
-        <div class="status-item">
-          <span>完成时间</span>
-          <strong>{{ formatDateTime(imdbSyncResult.finishedAt) }}</strong>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="panel">
-      <div class="panel-header">
-        <div>
-          <h2>手动同步剧集 IMDb 评分</h2>
-          <p>点击后会下载 IMDb 官方单集和评分数据集，并按每一季的单集平均分和评分人数总和更新剧集 IMDb 评分。</p>
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>手动导入</h2>
+          <p>按指定起始 ID 批量导入电影或剧集。</p>
         </div>
-        <div class="imdb-sync-actions">
-          <button class="secondary-btn" :disabled="tvSeasonImdbSyncRunning" @click="runTvSeasonImdbSync(true)">
-            {{ tvSeasonImdbSyncRunning ? '同步中' : '只同步待补' }}
-          </button>
-          <button class="primary-btn" :disabled="tvSeasonImdbSyncRunning" @click="runTvSeasonImdbSync()">
-            {{ tvSeasonImdbSyncRunning ? '同步中' : '全量同步' }}
-          </button>
-        </div>
-      </div>
 
-      <div class="imdb-status-row">
-        <div class="status-item">
-          <span>上次同步时间</span>
-          <strong>{{ formatDateTime(tvSeasonImdbSyncStatus?.lastSyncedAt) }}</strong>
-        </div>
-        <div v-if="tvSeasonImdbSyncStatus?.syncing" class="status-item">
-          <span>当前同步开始</span>
-          <strong>{{ formatDateTime(tvSeasonImdbSyncStatus.currentStartedAt) }}</strong>
-        </div>
-        <div class="status-item">
-          <span>待补 IMDb 评分</span>
-          <strong>{{ formatNumber(tvSeasonImdbSyncStatus?.missingRatingCount) }}</strong>
-        </div>
-      </div>
+        <div class="task-grid">
+          <article class="task-card compact-card">
+            <div class="task-card-header">
+              <div>
+                <span class="task-kicker">电影</span>
+                <h3>手动批量导入 TMDB 电影</h3>
+              </div>
+            </div>
+            <p>从输入的 TMDB ID 开始，按 ID 递增导入指定次数。导入次数默认 1。</p>
+            <div class="run-form">
+              <label class="form-field">
+                <span>起始 TMDB ID</span>
+                <input v-model.number="tmdbId" type="number" min="1" placeholder="输入 TMDB ID" />
+              </label>
+              <label class="form-field count-field">
+                <span>导入次数</span>
+                <input v-model.number="importCount" type="number" min="1" placeholder="1" />
+              </label>
+              <button class="primary-btn" :disabled="running" @click="runBatch">
+                {{ running ? '导入中' : '立即导入' }}
+              </button>
+            </div>
+          </article>
 
-      <div v-if="tvSeasonImdbSyncResult" class="result-grid">
-        <div class="status-item">
-          <span>{{ tvSeasonImdbSyncResult.missingOnly ? '本次待补 IMDb 评分' : '本地 IMDb 父级 ID' }}</span>
-          <strong>{{ tvSeasonImdbSyncResult.moviesWithImdbId }}</strong>
+          <article class="task-card compact-card">
+            <div class="task-card-header">
+              <div>
+                <span class="task-kicker">剧集</span>
+                <h3>手动批量导入 TMDB 剧集</h3>
+              </div>
+            </div>
+            <p>从输入的 TMDB 剧集 ID 开始，按 ID 递增导入指定次数；每个 ID 会导入全部正式季。</p>
+            <div class="run-form">
+              <label class="form-field">
+                <span>起始 TMDB 剧集 ID</span>
+                <input v-model.number="tvSeasonTmdbId" type="number" min="1" placeholder="输入 TMDB 剧集 ID" />
+              </label>
+              <label class="form-field count-field">
+                <span>导入次数</span>
+                <input v-model.number="tvSeasonImportCount" type="number" min="1" placeholder="1" />
+              </label>
+              <button class="primary-btn" :disabled="tvSeasonRunning" @click="runTvSeasonBatch">
+                {{ tvSeasonRunning ? '导入中' : '立即导入' }}
+              </button>
+            </div>
+          </article>
         </div>
-        <div class="status-item">
-          <span>评分数据集总行数</span>
-          <strong>{{ tvSeasonImdbSyncResult.totalRatingsRows }}</strong>
-        </div>
-        <div class="status-item">
-          <span>匹配剧集季</span>
-          <strong>{{ tvSeasonImdbSyncResult.matchedMovies }}</strong>
-        </div>
-        <div class="status-item">
-          <span>已更新</span>
-          <strong>{{ tvSeasonImdbSyncResult.updatedMovies }}</strong>
-        </div>
-        <div class="status-item">
-          <span>未匹配</span>
-          <strong>{{ tvSeasonImdbSyncResult.missingMovies }}</strong>
-        </div>
-        <div class="status-item">
-          <span>完成时间</span>
-          <strong>{{ formatDateTime(tvSeasonImdbSyncResult.finishedAt) }}</strong>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <div v-if="message" class="message success">{{ message }}</div>
-    <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>IMDb 评分同步</h2>
+          <p>同步 IMDb 评分和评分人数，支持全量同步和只同步待补。</p>
+        </div>
+
+        <div class="task-grid">
+          <article class="task-card sync-card">
+            <div class="task-card-header">
+              <div>
+                <span class="task-kicker">电影</span>
+                <h3>电影 IMDb 评分同步</h3>
+              </div>
+              <div class="imdb-sync-actions">
+                <button class="secondary-btn" :disabled="imdbSyncRunning" @click="runImdbSync(true)">
+                  {{ imdbSyncRunning ? '同步中' : '只同步待补' }}
+                </button>
+                <button class="primary-btn" :disabled="imdbSyncRunning" @click="runImdbSync()">
+                  {{ imdbSyncRunning ? '同步中' : '全量同步' }}
+                </button>
+              </div>
+            </div>
+            <p>下载 IMDb 官方评分数据集，并用电影表里的 IMDb ID 更新 IMDb 评分和评分人数。</p>
+
+            <div class="info-grid imdb-status-row">
+              <div class="info-item">
+                <span>上次同步时间</span>
+                <strong>{{ formatDateTime(imdbSyncStatus?.lastSyncedAt) }}</strong>
+              </div>
+              <div class="info-item">
+                <span>待补 IMDb 评分</span>
+                <strong>{{ formatNumber(imdbSyncStatus?.missingRatingCount) }}</strong>
+              </div>
+              <div v-if="imdbSyncStatus?.syncing" class="info-item syncing-item">
+                <span>当前同步开始</span>
+                <strong>{{ formatDateTime(imdbSyncStatus.currentStartedAt) }}</strong>
+              </div>
+            </div>
+
+            <div v-if="imdbSyncResult" class="result-block">
+              <div class="result-title">最近结果</div>
+              <div class="result-grid">
+                <div class="info-item">
+                  <span>{{ imdbSyncResult.missingOnly ? '本次待补 IMDb 评分' : '本地 IMDb ID' }}</span>
+                  <strong>{{ imdbSyncResult.moviesWithImdbId }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>数据集总行数</span>
+                  <strong>{{ imdbSyncResult.totalRatingsRows }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>匹配电影</span>
+                  <strong>{{ imdbSyncResult.matchedMovies }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>已更新</span>
+                  <strong>{{ imdbSyncResult.updatedMovies }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>未匹配</span>
+                  <strong>{{ imdbSyncResult.missingMovies }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>完成时间</span>
+                  <strong>{{ formatDateTime(imdbSyncResult.finishedAt) }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <article class="task-card sync-card">
+            <div class="task-card-header">
+              <div>
+                <span class="task-kicker">剧集</span>
+                <h3>剧集 IMDb 评分同步</h3>
+              </div>
+              <div class="imdb-sync-actions">
+                <button class="secondary-btn" :disabled="tvSeasonImdbSyncRunning" @click="runTvSeasonImdbSync(true)">
+                  {{ tvSeasonImdbSyncRunning ? '同步中' : '只同步待补' }}
+                </button>
+                <button class="primary-btn" :disabled="tvSeasonImdbSyncRunning" @click="runTvSeasonImdbSync()">
+                  {{ tvSeasonImdbSyncRunning ? '同步中' : '全量同步' }}
+                </button>
+              </div>
+            </div>
+            <p>下载 IMDb 官方单集和评分数据集，并按每一季的单集平均分和评分人数总和更新剧集 IMDb 评分。</p>
+
+            <div class="info-grid imdb-status-row">
+              <div class="info-item">
+                <span>上次同步时间</span>
+                <strong>{{ formatDateTime(tvSeasonImdbSyncStatus?.lastSyncedAt) }}</strong>
+              </div>
+              <div class="info-item">
+                <span>待补 IMDb 评分</span>
+                <strong>{{ formatNumber(tvSeasonImdbSyncStatus?.missingRatingCount) }}</strong>
+              </div>
+              <div v-if="tvSeasonImdbSyncStatus?.syncing" class="info-item syncing-item">
+                <span>当前同步开始</span>
+                <strong>{{ formatDateTime(tvSeasonImdbSyncStatus.currentStartedAt) }}</strong>
+              </div>
+            </div>
+
+            <div v-if="tvSeasonImdbSyncResult" class="result-block">
+              <div class="result-title">最近结果</div>
+              <div class="result-grid">
+                <div class="info-item">
+                  <span>{{ tvSeasonImdbSyncResult.missingOnly ? '本次待补 IMDb 评分' : '本地 IMDb 父级 ID' }}</span>
+                  <strong>{{ tvSeasonImdbSyncResult.moviesWithImdbId }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>评分数据集总行数</span>
+                  <strong>{{ tvSeasonImdbSyncResult.totalRatingsRows }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>匹配剧集季</span>
+                  <strong>{{ tvSeasonImdbSyncResult.matchedMovies }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>已更新</span>
+                  <strong>{{ tvSeasonImdbSyncResult.updatedMovies }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>未匹配</span>
+                  <strong>{{ tvSeasonImdbSyncResult.missingMovies }}</strong>
+                </div>
+                <div class="info-item">
+                  <span>完成时间</span>
+                  <strong>{{ formatDateTime(tvSeasonImdbSyncResult.finishedAt) }}</strong>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .admin-page {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  background: #f5f6f8;
+  color: #111827;
+  margin: -24px;
+  min-height: calc(100vh - 72px);
+  padding: 24px;
 }
 
-.panel {
+.admin-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  margin: 0 auto;
+  max-width: 1360px;
+}
+
+.admin-header,
+.section-block,
+.task-card {
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 22px;
 }
 
-.panel-header {
+.admin-header {
+  align-items: center;
   display: flex;
-  align-items: flex-start;
+  gap: 18px;
   justify-content: space-between;
+  padding: 22px 24px;
+}
+
+.section-block {
+  padding: 20px;
+}
+
+.section-heading {
+  align-items: flex-end;
+  display: flex;
   gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
 }
 
 h1,
-h2 {
+h2,
+h3 {
   margin: 0;
-  color: #111827;
 }
 
 h1 {
-  font-size: 24px;
+  font-size: 26px;
+  font-weight: 700;
 }
 
 h2 {
   font-size: 18px;
+  font-weight: 700;
+}
+
+h3 {
+  font-size: 17px;
+  font-weight: 700;
 }
 
 p {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.6;
   margin: 8px 0 0;
-  color: #6b7280;
 }
 
-.status-grid {
+.task-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 22px;
-}
-
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 22px;
-}
-
-.imdb-status-row {
-  display: grid;
+  gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 22px;
 }
 
-.status-item {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 14px;
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
 }
 
-.status-item span {
+.compact-card {
+  gap: 14px;
+}
+
+.sync-card {
+  gap: 15px;
+}
+
+.task-card-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.task-kicker {
+  color: #1677ff;
   display: block;
-  color: #6b7280;
-  font-size: 13px;
-  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin-bottom: 6px;
 }
 
-.status-item strong {
+.status-badge {
+  background: #eaf8ef;
+  border: 1px solid #bfe8cc;
+  border-radius: 999px;
   color: #16803c;
-  font-size: 18px;
-  word-break: break-word;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 8px 11px;
 }
 
-.status-item strong.paused {
+.status-badge.paused {
+  background: #fff7ed;
+  border-color: #fed7aa;
   color: #b45309;
 }
 
-.actions,
+.primary-metric {
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.primary-metric span,
+.info-item span,
+.form-field span {
+  color: #6b7280;
+  display: block;
+  font-size: 13px;
+}
+
+.primary-metric strong {
+  color: #1677ff;
+  display: block;
+  font-size: 30px;
+  font-weight: 750;
+  line-height: 1.1;
+  margin-top: 8px;
+  word-break: break-word;
+}
+
+.info-grid,
+.result-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.result-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.info-item {
+  background: #fafafa;
+  border: 1px solid #edf0f3;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.info-item strong {
+  color: #111827;
+  display: block;
+  font-size: 15px;
+  line-height: 1.35;
+  margin-top: 7px;
+  word-break: break-word;
+}
+
+.syncing-item {
+  background: #f8fbff;
+  border-color: #dbeafe;
+}
+
+.task-actions,
 .run-form {
-  display: flex;
   align-items: flex-end;
+  border-top: 1px solid #eef0f3;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+.run-form {
+  margin-top: 2px;
 }
 
 .imdb-sync-actions {
   display: flex;
-  gap: 10px;
-  align-items: center;
+  flex: 0 0 auto;
   flex-wrap: wrap;
+  gap: 10px;
   justify-content: flex-end;
 }
 
@@ -846,46 +1006,40 @@ p {
   gap: 7px;
 }
 
-.form-field span {
-  color: #4b5563;
-  font-size: 13px;
-}
-
-.actions input,
-.run-form input {
-  width: 220px;
-  height: 38px;
+.form-field input {
+  background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 6px;
-  padding: 0 12px;
+  color: #111827;
+  height: 38px;
   outline: none;
+  padding: 0 12px;
+  width: 220px;
 }
 
-.actions input:focus,
-.run-form input:focus {
+.form-field input:focus {
   border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
 }
 
-.count-field input {
-  width: 130px;
-}
-
+.count-field input,
 .interval-field input {
   width: 140px;
 }
 
 button {
-  height: 38px;
   border: none;
   border-radius: 6px;
-  padding: 0 16px;
   cursor: pointer;
+  font-weight: 700;
+  height: 38px;
+  padding: 0 16px;
   white-space: nowrap;
 }
 
 button:disabled {
-  opacity: 0.6;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .primary-btn,
@@ -895,8 +1049,8 @@ button:disabled {
 }
 
 .secondary-btn {
-  border: 1px solid #cfe0ff;
   background: #eef5ff;
+  border: 1px solid #cfe0ff;
   color: #1677ff;
 }
 
@@ -904,54 +1058,81 @@ button:disabled {
   background: #dc2626;
 }
 
+.result-block {
+  border-top: 1px solid #eef0f3;
+  padding-top: 14px;
+}
+
+.result-title {
+  color: #374151;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
 .message {
   border-radius: 8px;
-  padding: 12px 14px;
   font-size: 14px;
+  padding: 12px 14px;
 }
 
 .message.success {
-  border: 1px solid #bbf7d0;
   background: #f0fdf4;
+  border: 1px solid #bbf7d0;
   color: #166534;
 }
 
 .message.error {
-  border: 1px solid #fecaca;
   background: #fef2f2;
+  border: 1px solid #fecaca;
   color: #991b1b;
 }
 
+@media (max-width: 980px) {
+  .admin-page {
+    margin: -16px;
+    padding: 16px;
+  }
+
+  .task-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 760px) {
-  .panel {
+  .admin-header,
+  .section-heading,
+  .task-card-header,
+  .task-actions,
+  .run-form,
+  .imdb-sync-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-header,
+  .section-block,
+  .task-card {
     padding: 16px;
   }
 
   h1 {
-    font-size: 21px;
+    font-size: 22px;
   }
 
-  .panel-header,
-  .actions,
-  .run-form,
-  .imdb-sync-actions {
-    flex-direction: column;
+  .primary-metric strong {
+    font-size: 26px;
   }
 
-  .status-grid,
-  .result-grid,
-  .imdb-status-row {
+  .info-grid,
+  .result-grid {
     grid-template-columns: 1fr;
   }
 
-  .form-field {
-    width: 100%;
-  }
-
-  .run-form input,
-  .actions input,
-  .interval-field input,
+  .form-field,
+  .form-field input,
   .count-field input,
+  .interval-field input,
   .imdb-sync-actions,
   button {
     width: 100%;
