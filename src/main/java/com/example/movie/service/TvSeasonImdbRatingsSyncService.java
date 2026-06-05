@@ -40,6 +40,7 @@ public class TvSeasonImdbRatingsSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(TvSeasonImdbRatingsSyncService.class);
     private static final int BATCH_SIZE = 500;
+    private static final int DEFAULT_SYNC_BATCH_SIZE = 500;
     private static final String UPDATE_SQL = """
             UPDATE tv_season
             SET imdb_vote_average = ?,
@@ -93,6 +94,9 @@ public class TvSeasonImdbRatingsSyncService {
     @Value("${imdb.ratings.timeout-minutes:15}")
     private Long ratingsTimeoutMinutes;
 
+    @Value("${imdb.tv-season.sync.batch-size:" + DEFAULT_SYNC_BATCH_SIZE + "}")
+    private Integer syncBatchSize;
+
     public TvSeasonImdbRatingsSyncService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager) {
         this.jdbcTemplate = jdbcTemplate;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
@@ -139,17 +143,43 @@ public class TvSeasonImdbRatingsSyncService {
         LocalDateTime ratingUpdatedAt = LocalDateTime.now();
         Map<SeasonKey, List<Long>> seasonIdsByKey = loadSeasonIdsByKey(missingOnly);
         int seasonsWithImdbParentId = seasonIdsByKey.values().stream().mapToInt(List::size).sum();
-        int totalRatingsRows = 0;
 
         if (seasonsWithImdbParentId == 0) {
             return buildSyncResponse(startedAt, missingOnly, 0, 0, 0, 0);
         }
 
-        EpisodeMapping episodeMapping = loadEpisodeMapping(seasonIdsByKey);
-        if (episodeMapping.episodeIdsByImdbId().isEmpty()) {
-            return buildSyncResponse(startedAt, missingOnly, seasonsWithImdbParentId, 0, 0, 0);
+        int totalRatingsRows = 0;
+        int matchedSeasons = 0;
+        int updatedSeasons = 0;
+        Set<Long> matchedSeasonIds = new HashSet<>();
+        int batchSize = resolveSyncBatchSize();
+        List<SeasonBatch> seasonBatches = buildSeasonBatches(seasonIdsByKey, batchSize);
+
+        for (SeasonBatch seasonBatch : seasonBatches) {
+            BatchSyncResult batchResult = syncSeasonBatch(seasonBatch, ratingUpdatedAt);
+            totalRatingsRows = Math.max(totalRatingsRows, batchResult.totalRatingsRows());
+            updatedSeasons += batchResult.updatedSeasons();
+            matchedSeasonIds.addAll(batchResult.matchedSeasonIds());
+            matchedSeasons = matchedSeasonIds.size();
         }
 
+        return buildSyncResponse(
+                startedAt,
+                missingOnly,
+                seasonsWithImdbParentId,
+                totalRatingsRows,
+                matchedSeasons,
+                updatedSeasons
+        );
+    }
+
+    private BatchSyncResult syncSeasonBatch(SeasonBatch seasonBatch, LocalDateTime ratingUpdatedAt) {
+        EpisodeMapping episodeMapping = loadEpisodeMapping(seasonBatch.seasonIdsByKey());
+        if (episodeMapping.episodeIdsByImdbId().isEmpty()) {
+            return new BatchSyncResult(0, 0, Set.of());
+        }
+
+        int totalRatingsRows = 0;
         Map<Long, RatingAccumulator> ratingsBySeasonId = new HashMap<>();
 
         try (InputStream responseBody = openDatasetStream(ratingsUrl);
@@ -184,14 +214,37 @@ public class TvSeasonImdbRatingsSyncService {
         List<Object[]> updateArgs = buildUpdateArgs(ratingsBySeasonId, ratingUpdatedAt);
         int updatedSeasons = updateMatchedSeasons(updateArgs);
 
-        return buildSyncResponse(
-                startedAt,
-                missingOnly,
-                seasonsWithImdbParentId,
-                totalRatingsRows,
-                ratingsBySeasonId.size(),
-                updatedSeasons
-        );
+        return new BatchSyncResult(totalRatingsRows, updatedSeasons, ratingsBySeasonId.keySet());
+    }
+
+    private List<SeasonBatch> buildSeasonBatches(Map<SeasonKey, List<Long>> seasonIdsByKey, int batchSize) {
+        List<SeasonBatch> batches = new ArrayList<>();
+        Map<SeasonKey, List<Long>> currentBatch = new HashMap<>();
+        int currentSeasonCount = 0;
+
+        for (Map.Entry<SeasonKey, List<Long>> entry : seasonIdsByKey.entrySet()) {
+            if (!currentBatch.isEmpty() && currentSeasonCount + entry.getValue().size() > batchSize) {
+                batches.add(new SeasonBatch(currentBatch));
+                currentBatch = new HashMap<>();
+                currentSeasonCount = 0;
+            }
+
+            currentBatch.put(entry.getKey(), entry.getValue());
+            currentSeasonCount += entry.getValue().size();
+        }
+
+        if (!currentBatch.isEmpty()) {
+            batches.add(new SeasonBatch(currentBatch));
+        }
+
+        return batches;
+    }
+
+    private int resolveSyncBatchSize() {
+        if (syncBatchSize == null || syncBatchSize < 1) {
+            return DEFAULT_SYNC_BATCH_SIZE;
+        }
+        return syncBatchSize;
     }
 
     private EpisodeMapping loadEpisodeMapping(Map<SeasonKey, List<Long>> seasonIdsByKey) {
@@ -346,6 +399,12 @@ public class TvSeasonImdbRatingsSyncService {
     }
 
     private record EpisodeMapping(Map<String, List<Long>> episodeIdsByImdbId, int matchedSeasonCount) {
+    }
+
+    private record SeasonBatch(Map<SeasonKey, List<Long>> seasonIdsByKey) {
+    }
+
+    private record BatchSyncResult(int totalRatingsRows, int updatedSeasons, Set<Long> matchedSeasonIds) {
     }
 
     private static class RatingAccumulator {
