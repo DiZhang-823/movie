@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getTvSeasonById, type TvSeasonCollectionItem, type TvSeasonDetail } from '../api/tvSeason'
@@ -262,7 +262,7 @@ watch(() => route.params.id, () => {
         <div class="hero-inner detail-hero-inner">
           <div class="poster-box poster-section">
             <img v-if="season.posterPath" :src="getImageUrl(season.posterPath, 'w500')" :alt="displayTitle" />
-            <div v-else class="poster-placeholder">{{ displayTitle?.slice(0, 1) }}</div>
+            <div v-else class="poster-placeholder">No Image</div>
           </div>
 
           <div class="hero-main hero-summary">
@@ -349,7 +349,7 @@ watch(() => route.params.id, () => {
                 >
                   <div class="collection-thumb">
                     <img v-if="getCollectionPosterUrl(item)" :src="getCollectionPosterUrl(item)" :alt="item.seasonName" />
-                    <div v-else class="collection-thumb-placeholder">{{ item.seasonName.slice(0, 1) }}</div>
+                    <div v-else class="collection-thumb-placeholder">No Image</div>
                     <span class="collection-order">{{ item.seasonNumber }}</span>
                   </div>
                   <div class="collection-card-info">
@@ -375,7 +375,7 @@ watch(() => route.params.id, () => {
               <h2>导演</h2>
               <RouterLink v-for="person in season.directors" :key="`mobile-director-${person.personId}`" class="compact-person" :to="`/persons/${person.personId}`">
                 <img v-if="person.profilePath" :src="getImageUrl(person.profilePath, 'w185')" :alt="person.name" />
-                <div v-else class="compact-placeholder">{{ person.name.slice(0, 1) }}</div>
+                <div v-else class="compact-placeholder">No Image</div>
                 <strong>{{ person.name }}</strong>
               </RouterLink>
             </section>
@@ -384,7 +384,7 @@ watch(() => route.params.id, () => {
               <h2>编剧</h2>
               <RouterLink v-for="person in season.writers" :key="`mobile-writer-${person.personId}`" class="compact-person" :to="`/persons/${person.personId}`">
                 <img v-if="person.profilePath" :src="getImageUrl(person.profilePath, 'w185')" :alt="person.name" />
-                <div v-else class="compact-placeholder">{{ person.name.slice(0, 1) }}</div>
+                <div v-else class="compact-placeholder">No Image</div>
                 <strong>{{ person.name }}</strong>
               </RouterLink>
             </section>
@@ -393,7 +393,7 @@ watch(() => route.params.id, () => {
               <h2>制片人</h2>
               <RouterLink v-for="person in season.producers" :key="`mobile-producer-${person.personId}`" class="compact-person" :to="`/persons/${person.personId}`">
                 <img v-if="person.profilePath" :src="getImageUrl(person.profilePath, 'w185')" :alt="person.name" />
-                <div v-else class="compact-placeholder">{{ person.name.slice(0, 1) }}</div>
+                <div v-else class="compact-placeholder">No Image</div>
                 <strong>{{ person.name }}</strong>
               </RouterLink>
             </section>
@@ -404,7 +404,7 @@ watch(() => route.params.id, () => {
             <div v-if="displayCast.length" class="people-grid">
               <RouterLink v-for="person in displayCast" :key="person.personId" class="person-card" :to="`/persons/${person.personId}`">
                 <img v-if="person.profilePath" class="person-avatar" :src="getImageUrl(person.profilePath, 'w185')" :alt="person.name" />
-                <div v-else class="avatar-placeholder person-avatar placeholder">{{ person.name.slice(0, 1) }}</div>
+                <div v-else class="avatar-placeholder person-avatar placeholder">No Image</div>
                 <div class="person-info">
                   <strong class="person-name">{{ person.name }}</strong>
                   <span class="person-role">{{ getPersonRole(person) }}</span>
@@ -431,7 +431,7 @@ watch(() => route.params.id, () => {
             <h2>导演</h2>
             <RouterLink v-for="person in season.directors" :key="person.personId" class="compact-person" :to="`/persons/${person.personId}`">
               <img v-if="person.profilePath" :src="getImageUrl(person.profilePath, 'w185')" :alt="person.name" />
-              <div v-else class="compact-placeholder">{{ person.name.slice(0, 1) }}</div>
+              <div v-else class="compact-placeholder">No Image</div>
               <strong>{{ person.name }}</strong>
             </RouterLink>
           </section>
@@ -440,7 +440,7 @@ watch(() => route.params.id, () => {
             <h2>编剧</h2>
             <RouterLink v-for="person in season.writers" :key="person.personId" class="compact-person" :to="`/persons/${person.personId}`">
               <img v-if="person.profilePath" :src="getImageUrl(person.profilePath, 'w185')" :alt="person.name" />
-              <div v-else class="compact-placeholder">{{ person.name.slice(0, 1) }}</div>
+              <div v-else class="compact-placeholder">No Image</div>
               <strong>{{ person.name }}</strong>
             </RouterLink>
           </section>
@@ -449,7 +449,7 @@ watch(() => route.params.id, () => {
             <h2>制片人</h2>
             <RouterLink v-for="person in season.producers" :key="person.personId" class="compact-person" :to="`/persons/${person.personId}`">
               <img v-if="person.profilePath" :src="getImageUrl(person.profilePath, 'w185')" :alt="person.name" />
-              <div v-else class="compact-placeholder">{{ person.name.slice(0, 1) }}</div>
+              <div v-else class="compact-placeholder">No Image</div>
               <strong>{{ person.name }}</strong>
             </RouterLink>
           </section>
@@ -581,10 +581,10 @@ watch(() => route.params.id, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #d1d5db;
-  color: #374151;
-  font-size: 42px;
-  font-weight: 900;
+  background: #e5e7eb;
+  color: #999;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .title-row {
@@ -901,9 +901,11 @@ watch(() => route.params.id, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #516176;
-  font-size: 18px;
-  font-weight: 850;
+  color: #999;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .collection-order {
@@ -999,17 +1001,18 @@ watch(() => route.params.id, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef1f5;
-  color: #516176;
-  font-size: 28px;
-  font-weight: 900;
+  background: #e5e7eb;
+  color: #999;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .avatar-placeholder,
 .compact-placeholder {
-  background:
-    radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.52), transparent 24%),
-    linear-gradient(145deg, #dfe6ee, #b9c6d5);
+  background: #e5e7eb;
+  color: #999;
 }
 
 .person-info {
@@ -1076,9 +1079,12 @@ watch(() => route.params.id, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #eef1f5;
-  color: #516176;
-  font-weight: 900;
+  background: #e5e7eb;
+  color: #999;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .compact-person strong {

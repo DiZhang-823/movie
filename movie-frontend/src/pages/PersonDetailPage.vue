@@ -419,9 +419,7 @@ onBeforeUnmount(() => {
                     :src="getCreditPosterUrl(credit)"
                     :alt="credit.title"
                   />
-                  <div v-else class="work-poster placeholder">
-                    {{ credit.title?.slice(0, 1) || '?' }}
-                  </div>
+                  <div v-else class="work-poster placeholder">No Image</div>
                   <span class="credit-role">{{ getCreditRole(credit) }}</span>
                 </div>
                 <div class="work-title">{{ credit.title }}</div>
@@ -530,8 +528,17 @@ onBeforeUnmount(() => {
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.34);
 }
 
-.profile-image.placeholder,
 .work-poster.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e5e7eb;
+  color: #999;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.profile-image.placeholder {
   display: flex;
   align-items: center;
   justify-content: center;

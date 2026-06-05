@@ -1006,7 +1006,7 @@ onBeforeUnmount(() => {
           <a class="poster-link" :href="`/tv-seasons/${item.id}`" target="_blank" rel="noopener noreferrer">
             <div class="poster-wrap">
               <img v-if="item.posterPath" :src="getPosterUrl(item.posterPath)" :alt="getDisplayTitle(item)" />
-              <div v-else class="poster-placeholder">{{ getDisplayTitle(item).slice(0, 1) }}</div>
+              <div v-else class="poster-placeholder">No Image</div>
               <div class="episode-badge">{{ item.episodeCount ?? '-' }} 集</div>
               <div
                 v-if="item.userTvSeasonStatus"
@@ -1583,9 +1583,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
-  font-size: 30px;
-  font-weight: 800;
+  color: #999;
+  font-size: 14px;
+  font-weight: 400;
 }
 
 .episode-badge {

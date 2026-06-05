@@ -616,9 +616,7 @@ watch(() => route.params.id, () => {
                       :src="getCollectionPosterUrl(item)"
                       :alt="item.title"
                     />
-                    <div v-else class="collection-thumb-placeholder">
-                      {{ item.title.slice(0, 1) }}
-                    </div>
+                    <div v-else class="collection-thumb-placeholder">No Image</div>
                     <span class="collection-order">{{ item.sequenceNumber }}</span>
                   </div>
 
@@ -656,7 +654,7 @@ watch(() => route.params.id, () => {
                   :src="getImageUrl(person.profilePath, 'w185')"
                   :alt="person.name"
                 />
-                <div v-else class="compact-avatar placeholder">{{ person.name?.slice(0, 1) || '?' }}</div>
+                <div v-else class="compact-avatar placeholder">No Image</div>
                 <div>
                   <strong>{{ person.name }}</strong>
                   <span>{{ getPersonSubtitle(person) }}</span>
@@ -685,9 +683,7 @@ watch(() => route.params.id, () => {
                     :alt="person.name"
                     class="person-avatar"
                   />
-                  <div v-else class="person-avatar placeholder">
-                    {{ person.name?.slice(0, 1) || '?' }}
-                  </div>
+                  <div v-else class="person-avatar placeholder">No Image</div>
 
                   <div class="person-info">
                     <div class="person-name">{{ person.name || '未知姓名' }}</div>
@@ -740,7 +736,7 @@ watch(() => route.params.id, () => {
                   :src="getImageUrl(person.profilePath, 'w185')"
                   :alt="person.name"
                 />
-                <div v-else class="compact-avatar placeholder">{{ person.name?.slice(0, 1) || '?' }}</div>
+                <div v-else class="compact-avatar placeholder">No Image</div>
                 <div>
                   <strong>{{ person.name }}</strong>
                   <span>{{ getPersonSubtitle(person) }}</span>
@@ -1220,9 +1216,11 @@ watch(() => route.params.id, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #516176;
-  font-size: 18px;
-  font-weight: 850;
+  color: #999;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .collection-order {
@@ -1329,15 +1327,16 @@ watch(() => route.params.id, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at 50% 26%, rgba(255, 255, 255, 0.52), transparent 24%),
-    linear-gradient(145deg, #dfe6ee, #b9c6d5);
-  color: #516176;
-  font-weight: 850;
+  background: #e5e7eb;
+  color: #999;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .person-avatar.placeholder {
-  font-size: 32px;
+  font-size: 12px;
 }
 
 .person-info {
