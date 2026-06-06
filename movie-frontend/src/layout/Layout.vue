@@ -16,9 +16,14 @@
             登录
           </button>
 
-          <div v-else class="user-info">
-            <span class="user-name">{{ displayName }}</span>
-            <button class="logout-btn" @click="logout">退出</button>
+          <div v-else ref="userMenuRef" class="user-menu">
+            <button class="user-trigger" :class="{ active: userMenuOpen }" @click="toggleUserMenu">
+              <span class="user-name">{{ displayName }}</span>
+              <span class="user-arrow" :class="{ open: userMenuOpen }">▾</span>
+            </button>
+            <div v-if="userMenuOpen" class="user-dropdown">
+              <button class="dropdown-item" @click="logout">退出</button>
+            </div>
           </div>
         </div>
       </div>
@@ -33,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { request } from '../utils/request'
 import { isLoggedIn, removeToken } from '../utils/auth'
@@ -41,6 +46,8 @@ import { isLoggedIn, removeToken } from '../utils/auth'
 const router = useRouter()
 
 const currentUser = ref<{ username: string; nickname?: string | null; isAdmin?: boolean } | null>(null)
+const userMenuOpen = ref(false)
+const userMenuRef = ref<HTMLElement | null>(null)
 
 const displayName = computed(() => {
   if (!currentUser.value) {
@@ -84,7 +91,27 @@ function goToLogin() {
   router.push('/login')
 }
 
+function toggleUserMenu() {
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+function closeUserMenu() {
+  userMenuOpen.value = false
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!userMenuOpen.value) {
+    return
+  }
+  const target = event.target
+  if (target instanceof Node && userMenuRef.value?.contains(target)) {
+    return
+  }
+  closeUserMenu()
+}
+
 async function logout() {
+  closeUserMenu()
   removeToken()
   currentUser.value = null
   await router.push('/movies')
@@ -93,6 +120,11 @@ async function logout() {
 
 onMounted(() => {
   loadCurrentUser()
+  document.addEventListener('click', handleDocumentClick)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick)
 })
 </script>
 
@@ -153,8 +185,7 @@ onMounted(() => {
   min-width: 0;
 }
 
-.login-btn,
-.logout-btn {
+.login-btn {
   height: 36px;
   padding: 0 14px;
   border: none;
@@ -165,20 +196,84 @@ onMounted(() => {
   white-space: nowrap;
 }
 
-.user-info {
+.user-menu {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+}
+
+.user-trigger {
+  max-width: 180px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+}
+
+.user-trigger:hover,
+.user-trigger.active {
+  background: #f3f4f6;
+  color: #1677ff;
 }
 
 .user-name {
   font-size: 15px;
-  color: #333;
   font-weight: 500;
-  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.user-arrow {
+  flex: 0 0 auto;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 0.16s ease;
+}
+
+.user-arrow.open {
+  transform: rotate(180deg);
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: 120px;
+  padding: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+.dropdown-item {
+  width: 100%;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #333;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dropdown-item:hover {
+  background: #f3f4f6;
+  color: #1677ff;
 }
 
 .main-content {
@@ -230,19 +325,24 @@ onMounted(() => {
     background: #e8f2ff;
   }
 
-  .user-info {
-    gap: 8px;
+  .user-trigger {
+    max-width: 118px;
+    height: 34px;
+    padding: 0 6px;
   }
 
   .user-name {
-    max-width: 96px;
     font-size: 14px;
   }
 
-  .login-btn,
-  .logout-btn {
+  .login-btn {
     height: 34px;
     padding: 0 12px;
+  }
+
+  .user-dropdown {
+    top: calc(100% + 6px);
+    width: 112px;
   }
 
   .main-content {
