@@ -412,6 +412,8 @@ onBeforeUnmount(() => {
                 :key="credit.movieId"
                 class="work-card"
                 :to="`/movies/${credit.movieId}`"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 <div class="work-poster">
                   <img
@@ -442,6 +444,8 @@ onBeforeUnmount(() => {
                 :key="`top-${credit.movieId}`"
                 class="top-item"
                 :to="`/movies/${credit.movieId}`"
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 <span class="top-rank">{{ index + 1 }}</span>
                 <span class="top-info">
