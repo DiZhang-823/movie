@@ -33,6 +33,31 @@ export type PersonDetail = {
     credits: PersonMovieCredit[]
 }
 
+export type PersonSearchItem = {
+    personId: number
+    name: string
+    originalName: string | null
+    profilePath: string | null
+    character: string | null
+    job: string | null
+}
+
+export async function searchPersons(name: string, size = 8): Promise<PersonSearchItem[]> {
+    const searchParams = new URLSearchParams()
+    if (name.trim()) {
+        searchParams.set('name', name.trim())
+    }
+    searchParams.set('size', String(size))
+
+    const response = await request(`/persons?${searchParams.toString()}`)
+
+    if (!response.ok) {
+        throw new Error('搜索人物失败')
+    }
+
+    return response.json()
+}
+
 export async function getPersonById(id: number): Promise<PersonDetail> {
     const response = await request(`/persons/${id}`)
 

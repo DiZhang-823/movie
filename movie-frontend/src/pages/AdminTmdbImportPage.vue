@@ -19,7 +19,9 @@ import {
   type ImdbRatingsSyncResult,
   type TmdbImportStatus
 } from '../api/tmdbImport'
+import AdminAwardsPanel from './AdminAwardsPanel.vue'
 
+const activeAdminTab = ref<'awards' | 'import'>('awards')
 const status = ref<TmdbImportStatus | null>(null)
 const tvSeasonStatus = ref<TmdbImportStatus | null>(null)
 const loading = ref(false)
@@ -497,17 +499,28 @@ onBeforeUnmount(() => {
       <header class="admin-header">
         <div>
           <h1>后台管理</h1>
-          <p>管理 TMDB 导入任务和 IMDb 评分同步。</p>
+          <p>管理奖项资料、TMDB 导入任务和 IMDb 评分同步。</p>
         </div>
-        <button class="refresh-btn" :disabled="loading" @click="refreshStatus">
+        <button v-if="activeAdminTab === 'import'" class="refresh-btn" :disabled="loading" @click="refreshStatus">
           {{ loading ? '刷新中' : '刷新' }}
         </button>
       </header>
 
+      <div class="admin-tabs" role="tablist" aria-label="后台管理模块">
+        <button :class="{ active: activeAdminTab === 'awards' }" @click="activeAdminTab = 'awards'">
+          奖项管理
+        </button>
+        <button :class="{ active: activeAdminTab === 'import' }" @click="activeAdminTab = 'import'">
+          数据导入
+        </button>
+      </div>
+
       <div v-if="message" class="message success">{{ message }}</div>
       <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
 
-      <section class="section-block">
+      <AdminAwardsPanel v-show="activeAdminTab === 'awards'" />
+
+      <section v-show="activeAdminTab === 'import'" class="section-block">
         <div class="section-heading">
           <h2>自动导入任务</h2>
           <p>控制电影和剧集的 TMDB 定时导入状态。</p>
@@ -597,7 +610,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="section-block">
+      <section v-show="activeAdminTab === 'import'" class="section-block">
         <div class="section-heading">
           <h2>手动导入</h2>
           <p>按指定起始 ID 批量导入电影或剧集。</p>
@@ -652,7 +665,7 @@ onBeforeUnmount(() => {
         </div>
       </section>
 
-      <section class="section-block">
+      <section v-show="activeAdminTab === 'import'" class="section-block">
         <div class="section-heading">
           <h2>IMDb 评分同步</h2>
           <p>同步 IMDb 评分和评分人数，支持全量同步和只同步待补。</p>
@@ -821,6 +834,28 @@ onBeforeUnmount(() => {
   gap: 18px;
   justify-content: space-between;
   padding: 22px 24px;
+}
+
+.admin-tabs {
+  align-self: flex-start;
+  background: #e9edf3;
+  border: 1px solid #dbe1ea;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+}
+
+.admin-tabs button {
+  background: transparent;
+  color: #4b5563;
+  min-width: 96px;
+}
+
+.admin-tabs button.active {
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  color: #1677ff;
 }
 
 .section-block {
@@ -1101,6 +1136,7 @@ button:disabled {
 
 @media (max-width: 760px) {
   .admin-header,
+  .admin-tabs,
   .section-heading,
   .task-card-header,
   .task-actions,
@@ -1134,8 +1170,14 @@ button:disabled {
   .count-field input,
   .interval-field input,
   .imdb-sync-actions,
+  .admin-tabs,
   button {
     width: 100%;
+  }
+
+  .admin-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

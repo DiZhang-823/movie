@@ -1,10 +1,13 @@
 package com.example.movie.controller;
 
 import com.example.movie.dto.PersonDetailResponse;
+import com.example.movie.dto.PersonItemResponse;
 import com.example.movie.service.PersonService;
 import com.example.movie.tmdb.dto.TmdbPersonResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/persons")
@@ -21,6 +24,14 @@ public class PersonController {
     @GetMapping("/tmdb/get/{personId}")
     public TmdbPersonResponse getPersonByIdFromTmdb(@PathVariable Long personId) {
         return personService.fetchPersonByIdFromTmdb(personId);
+    }
+
+    @GetMapping
+    public List<PersonItemResponse> searchPersons(
+            @RequestParam(required = false) String name,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return personService.searchPersons(name, size);
     }
 
     @GetMapping("/{personId}")

@@ -1,6 +1,7 @@
 package com.example.movie.service;
 
 import com.example.movie.dto.PersonDetailResponse;
+import com.example.movie.dto.PersonItemResponse;
 import com.example.movie.dto.PersonMovieCreditResponse;
 import com.example.movie.entity.Movie;
 import com.example.movie.entity.MoviePerson;
@@ -11,6 +12,8 @@ import com.example.movie.repository.PersonRepository;
 import com.example.movie.tmdb.TmdbClient;
 import com.example.movie.tmdb.dto.*;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -67,6 +70,22 @@ public class PersonService {
         response.setCredits(credits);
 
         return response;
+    }
+
+    public List<PersonItemResponse> searchPersons(String name, int size) {
+        int resolvedSize = Math.max(1, Math.min(size, 20));
+        String keyword = name == null ? "" : name.trim();
+        List<Person> persons = keyword.isBlank()
+                ? personRepository.findAll(PageRequest.of(0, resolvedSize, Sort.by(Sort.Direction.DESC, "popularity"))).getContent()
+                : personRepository.findByNameContainingIgnoreCaseOrOriginalNameContainingIgnoreCase(
+                        keyword,
+                        keyword,
+                        PageRequest.of(0, resolvedSize, Sort.by(Sort.Direction.DESC, "popularity"))
+                ).getContent();
+
+        return persons.stream()
+                .map(this::convertToPersonItemResponse)
+                .toList();
     }
 
     @Transactional
@@ -180,6 +199,15 @@ public class PersonService {
         }
 
         return new ArrayList<>(creditsByMovieId.values());
+    }
+
+    private PersonItemResponse convertToPersonItemResponse(Person person) {
+        PersonItemResponse response = new PersonItemResponse();
+        response.setPersonId(person.getId());
+        response.setName(person.getName());
+        response.setOriginalName(person.getOriginalName());
+        response.setProfilePath(person.getProfilePath());
+        return response;
     }
 
     private boolean hasText(String value) {

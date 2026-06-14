@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/favicon.ico",
                                 "/api/auth/**",
                                 "/api/movies/**",
+                                "/api/persons",
                                 "/api/tv-seasons",
                                 "/api/tv-seasons/**",
                                 "/api/persons/**",
