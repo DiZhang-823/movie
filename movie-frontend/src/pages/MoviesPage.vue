@@ -107,6 +107,7 @@ const watchedYear = ref(new Date().getFullYear())
 const watchedMonth = ref(new Date().getMonth() + 1)
 const watchedDay = ref(new Date().getDate())
 const savingMovieId = ref<number | null>(null)
+const batchDeleting = ref(false)
 
 let searchTimer: number | undefined
 
@@ -832,6 +833,41 @@ async function handleDeleteMovie(movie: MovieItem) {
   }
 }
 
+async function handleDeleteCurrentPageMovies() {
+  if (!isAdmin.value || batchDeleting.value || savingMovieId.value !== null || movies.value.length === 0) {
+    return
+  }
+
+  const currentMovies = [...movies.value]
+  const confirmed = window.confirm(`确认删除本页显示的 ${currentMovies.length} 部电影吗？`)
+  if (!confirmed) {
+    return
+  }
+
+  batchDeleting.value = true
+  closeActionPanels()
+
+  try {
+    for (const movie of currentMovies) {
+      await deleteMovie(movie.id)
+    }
+
+    const nextTotalElements = Math.max(0, totalElements.value - currentMovies.length)
+    const nextTotalPages = Math.ceil(nextTotalElements / size.value)
+    if (page.value > 0 && page.value >= nextTotalPages) {
+      page.value = Math.max(0, nextTotalPages - 1)
+    }
+
+    await loadMovies()
+  } catch (error) {
+    console.error(error)
+    window.alert('删除本页电影失败，请稍后再试')
+    await loadMovies()
+  } finally {
+    batchDeleting.value = false
+  }
+}
+
 async function confirmWatchedStatus(movieId: number) {
   await saveMovieStatus(movieId, {
     status: 'WATCHED',
@@ -1166,14 +1202,25 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="summary">
-      共 {{ totalElements }} 部电影
-      <span v-if="selectedCategory.name !== '全部'">｜当前类型：{{ selectedCategory.name }}</span>
-      <span v-if="selectedYear !== null">｜当前年份：{{ selectedYear }}</span>
-      <span v-if="selectedRegion.name !== '全部'">｜当前地区：{{ selectedRegion.name }}</span>
-      <span v-if="hasMovieRatingRangeFilter">｜当前评分：{{ movieRatingRangeLabel }}</span>
-      <span v-if="selectedSort.name !== '默认'">｜当前排序：{{ selectedSort.name }}
+    <div class="list-toolbar">
+      <div class="summary">
+        共 {{ totalElements }} 部电影
+        <span v-if="selectedCategory.name !== '全部'">｜当前类型：{{ selectedCategory.name }}</span>
+        <span v-if="selectedYear !== null">｜当前年份：{{ selectedYear }}</span>
+        <span v-if="selectedRegion.name !== '全部'">｜当前地区：{{ selectedRegion.name }}</span>
+        <span v-if="hasMovieRatingRangeFilter">｜当前评分：{{ movieRatingRangeLabel }}</span>
+        <span v-if="selectedSort.name !== '默认'">｜当前排序：{{ selectedSort.name }}
 </span>
+      </div>
+      <button
+        v-if="isAdmin"
+        type="button"
+        class="bulk-delete-btn"
+        :disabled="loading || batchDeleting || movies.length === 0"
+        @click="handleDeleteCurrentPageMovies"
+      >
+        {{ batchDeleting ? '删除中' : '删除本页' }}
+      </button>
     </div>
 
     <div v-if="loading" class="status">正在加载...</div>
@@ -1736,6 +1783,38 @@ onBeforeUnmount(() => {
   font-size: 14px;
   color: #666;
   line-height: 1.6;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 2px 0 12px;
+}
+
+.bulk-delete-btn {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.bulk-delete-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.bulk-delete-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .status {
