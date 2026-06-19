@@ -20,4 +20,8 @@ public interface AwardCategoryRepository extends JpaRepository<AwardCategory, Lo
     @Modifying
     @Query("DELETE FROM AwardCategory ac WHERE ac.awardEdition.awardBody.id = :awardBodyId")
     void deleteByAwardBodyId(@Param("awardBodyId") Long awardBodyId);
+
+    @Modifying
+    @Query("DELETE FROM AwardCategory ac WHERE ac.awardEdition.id = :awardEditionId")
+    void deleteByAwardEditionId(@Param("awardEditionId") Long awardEditionId);
 }

@@ -17,4 +17,8 @@ public interface AwardNominationRepository extends JpaRepository<AwardNomination
     @Modifying
     @Query("DELETE FROM AwardNomination an WHERE an.awardCategory.awardEdition.awardBody.id = :awardBodyId")
     void deleteByAwardBodyId(@Param("awardBodyId") Long awardBodyId);
+
+    @Modifying
+    @Query("DELETE FROM AwardNomination an WHERE an.awardCategory.awardEdition.id = :awardEditionId")
+    void deleteByAwardEditionId(@Param("awardEditionId") Long awardEditionId);
 }

@@ -6,6 +6,7 @@ import {
   createAwardEdition,
   createAwardNomination,
   deleteAwardBody,
+  deleteAwardEdition,
   getAwardBodies,
   getAwardCategories,
   getAwardEditions,
@@ -39,6 +40,7 @@ const message = ref('')
 const errorMessage = ref('')
 const bodyListExpanded = ref(false)
 const activeBodyMenuId = ref<number | null>(null)
+const activeEditionMenuId = ref<number | null>(null)
 
 const movieQuery = ref('')
 const tvSeasonQuery = ref('')
@@ -345,6 +347,7 @@ async function deleteBody(body: AwardBody) {
 }
 
 function editEdition(edition: AwardEdition) {
+  activeEditionMenuId.value = null
   editingEditionId.value = edition.id
   editionForm.name = edition.name
   editionForm.editionNumber = edition.editionNumber
@@ -352,6 +355,40 @@ function editEdition(edition: AwardEdition) {
   editionForm.ceremonyDate = edition.ceremonyDate ?? ''
   editionForm.description = edition.description ?? ''
   activeDetailTab.value = 'overview'
+}
+
+function toggleEditionMenu(editionId: number) {
+  activeEditionMenuId.value = activeEditionMenuId.value === editionId ? null : editionId
+}
+
+async function deleteEdition(edition: AwardEdition) {
+  activeEditionMenuId.value = null
+  const confirmed = window.confirm(`确认删除“${edition.name}”吗？该届下的具体奖项和提名也会一并删除。`)
+  if (!confirmed) {
+    return
+  }
+
+  saving.value = true
+  message.value = ''
+  errorMessage.value = ''
+  try {
+    await deleteAwardEdition(edition.id)
+    if (editingEditionId.value === edition.id) {
+      cancelEditionEdit()
+    }
+    if (selectedEditionId.value === edition.id) {
+      selectedEditionId.value = null
+    }
+    if (selectedBodyId.value) {
+      await loadEditions(selectedBodyId.value)
+    }
+    message.value = '奖项届数已删除'
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '删除奖项届数失败'
+  } finally {
+    saving.value = false
+  }
 }
 
 function editCategory(category: AwardCategory) {
@@ -634,6 +671,7 @@ function tvSeasonLabel(tvSeason: TvSeasonItem) {
 
 function closeBodyMenu() {
   activeBodyMenuId.value = null
+  activeEditionMenuId.value = null
 }
 
 onMounted(() => {
@@ -742,16 +780,37 @@ onBeforeUnmount(() => {
         </form>
 
         <div class="select-list">
-          <button
+          <div
             v-for="edition in editions"
             :key="edition.id"
             class="select-row"
             :class="{ active: edition.id === selectedEditionId }"
+            role="button"
+            tabindex="0"
             @click="selectedEditionId = edition.id"
+            @keydown.enter="selectedEditionId = edition.id"
           >
             <span>{{ edition.name }}</span>
             <em>{{ edition.awardYear || '-' }}</em>
-          </button>
+            <span class="row-actions">
+              <span class="body-menu-wrap" @click.stop>
+                <button
+                  type="button"
+                  class="body-menu-trigger"
+                  :class="{ active: activeEditionMenuId === edition.id }"
+                  :disabled="saving"
+                  aria-label="奖项届数操作"
+                  @click.stop="toggleEditionMenu(edition.id)"
+                >
+                  <span></span><span></span><span></span>
+                </button>
+                <span v-if="activeEditionMenuId === edition.id" class="body-action-menu">
+                  <button type="button" :disabled="saving" @click.stop="editEdition(edition)">编辑</button>
+                  <button type="button" class="danger-action" :disabled="saving" @click.stop="deleteEdition(edition)">删除</button>
+                </span>
+              </span>
+            </span>
+          </div>
           <div v-if="selectedBodyId && !editions.length" class="empty-line">暂无届数</div>
         </div>
       </div>
@@ -764,7 +823,6 @@ onBeforeUnmount(() => {
           <h2>{{ selectedEdition?.name || '请选择或新建届数' }}</h2>
           <p>{{ selectedEdition?.awardYear || '年份未设置' }} · 颁奖日期 {{ formatDate(selectedEdition?.ceremonyDate) }}</p>
         </div>
-        <button class="secondary-btn" :disabled="!selectedEdition" @click="selectedEdition && editEdition(selectedEdition)">编辑届数</button>
       </header>
 
       <div class="detail-tabs">
@@ -1128,6 +1186,15 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) auto auto;
   min-width: 0;
   text-align: left;
+}
+
+.select-row[role="button"] {
+  cursor: pointer;
+}
+
+.select-row[role="button"]:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
 }
 
 .category-row {

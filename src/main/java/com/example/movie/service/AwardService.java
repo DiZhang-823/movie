@@ -154,6 +154,16 @@ public class AwardService {
         return convertToEditionResponse(awardEditionRepository.save(awardEdition));
     }
 
+    @Transactional
+    public void deleteAwardEdition(Long id) {
+        AwardEdition awardEdition = awardEditionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Award edition not found with id:" + id));
+
+        awardNominationRepository.deleteByAwardEditionId(id);
+        awardCategoryRepository.deleteByAwardEditionId(id);
+        awardEditionRepository.delete(awardEdition);
+    }
+
     public List<AwardCategoryResponse> getAwardCategories(Long awardEditionId) {
         return awardCategoryRepository.findByAwardEditionIdOrderBySortOrderAscIdAsc(awardEditionId)
                 .stream()

@@ -89,6 +89,12 @@ public class AdminAwardController {
         return awardService.updateAwardEdition(id, request);
     }
 
+    @DeleteMapping("/editions/{id}")
+    @Operation(summary = "deleteAwardEdition: Delete an award edition and its nested award data")
+    public void deleteAwardEdition(@PathVariable Long id) {
+        awardService.deleteAwardEdition(id);
+    }
+
     @GetMapping("/categories")
     @Operation(summary = "getAwardCategories: List award categories for an edition")
     public List<AwardCategoryResponse> getAwardCategories(@RequestParam Long awardEditionId) {

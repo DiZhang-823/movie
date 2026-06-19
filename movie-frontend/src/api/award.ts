@@ -150,6 +150,16 @@ export async function updateAwardEdition(id: number, payload: AwardEditionPayloa
   }), 'Failed to update award edition')
 }
 
+export async function deleteAwardEdition(id: number): Promise<void> {
+  const response = await request(`/admin/awards/editions/${id}`, {
+    method: 'DELETE'
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(text || 'Failed to delete award edition')
+  }
+}
+
 export async function getAwardCategories(awardEditionId: number): Promise<AwardCategory[]> {
   return parseResponse(
     await request(`/admin/awards/categories?awardEditionId=${awardEditionId}`),
