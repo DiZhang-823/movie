@@ -181,6 +181,16 @@ export async function updateAwardCategory(id: number, payload: AwardCategoryPayl
   }), 'Failed to update award category')
 }
 
+export async function deleteAwardCategory(id: number): Promise<void> {
+  const response = await request(`/admin/awards/categories/${id}`, {
+    method: 'DELETE'
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(text || 'Failed to delete award category')
+  }
+}
+
 export async function getAwardNominations(awardCategoryId: number): Promise<AwardNomination[]> {
   return parseResponse(
     await request(`/admin/awards/nominations?awardCategoryId=${awardCategoryId}`),

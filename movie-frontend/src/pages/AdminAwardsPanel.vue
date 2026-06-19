@@ -6,6 +6,7 @@ import {
   createAwardEdition,
   createAwardNomination,
   deleteAwardBody,
+  deleteAwardCategory,
   deleteAwardEdition,
   getAwardBodies,
   getAwardCategories,
@@ -41,6 +42,7 @@ const errorMessage = ref('')
 const bodyListExpanded = ref(false)
 const activeBodyMenuId = ref<number | null>(null)
 const activeEditionMenuId = ref<number | null>(null)
+const activeCategoryMenuId = ref<number | null>(null)
 
 const movieQuery = ref('')
 const tvSeasonQuery = ref('')
@@ -392,11 +394,46 @@ async function deleteEdition(edition: AwardEdition) {
 }
 
 function editCategory(category: AwardCategory) {
+  activeCategoryMenuId.value = null
   editingCategoryId.value = category.id
   categoryForm.name = category.name
   categoryForm.sortOrder = category.sortOrder
   categoryForm.description = category.description ?? ''
   activeDetailTab.value = 'categories'
+}
+
+function toggleCategoryMenu(categoryId: number) {
+  activeCategoryMenuId.value = activeCategoryMenuId.value === categoryId ? null : categoryId
+}
+
+async function deleteCategory(category: AwardCategory) {
+  activeCategoryMenuId.value = null
+  const confirmed = window.confirm(`确认删除“${category.name}”吗？该奖项下的提名也会一并删除。`)
+  if (!confirmed) {
+    return
+  }
+
+  saving.value = true
+  message.value = ''
+  errorMessage.value = ''
+  try {
+    await deleteAwardCategory(category.id)
+    if (editingCategoryId.value === category.id) {
+      cancelCategoryEdit()
+    }
+    if (selectedCategoryId.value === category.id) {
+      selectedCategoryId.value = null
+    }
+    if (selectedEditionId.value) {
+      await loadCategories(selectedEditionId.value)
+    }
+    message.value = '具体奖项已删除，后续排序已前移'
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '删除具体奖项失败'
+  } finally {
+    saving.value = false
+  }
 }
 
 function cancelBodyEdit() {
@@ -672,6 +709,7 @@ function tvSeasonLabel(tvSeason: TvSeasonItem) {
 function closeBodyMenu() {
   activeBodyMenuId.value = null
   activeEditionMenuId.value = null
+  activeCategoryMenuId.value = null
 }
 
 onMounted(() => {
@@ -862,21 +900,39 @@ onBeforeUnmount(() => {
           </form>
 
           <div class="category-table">
-            <button
+            <div
               v-for="(category, index) in categories"
               :key="category.id"
               class="category-row"
               :class="{ active: category.id === selectedCategoryId }"
+              role="button"
+              tabindex="0"
               @click="selectCategory(category.id)"
+              @keydown.enter="selectCategory(category.id)"
             >
               <span class="sort-pill">{{ formatSort(category.sortOrder) }}</span>
               <strong>{{ category.name }}</strong>
               <span class="row-actions">
                 <button type="button" :disabled="index === 0 || saving" @click.stop="moveCategory(index, -1)">↑</button>
                 <button type="button" :disabled="index === categories.length - 1 || saving" @click.stop="moveCategory(index, 1)">↓</button>
-                <button type="button" @click.stop="editCategory(category)">编辑</button>
+                <span class="body-menu-wrap" @click.stop>
+                  <button
+                    type="button"
+                    class="body-menu-trigger"
+                    :class="{ active: activeCategoryMenuId === category.id }"
+                    :disabled="saving"
+                    aria-label="具体奖项操作"
+                    @click.stop="toggleCategoryMenu(category.id)"
+                  >
+                    <span></span><span></span><span></span>
+                  </button>
+                  <span v-if="activeCategoryMenuId === category.id" class="body-action-menu">
+                    <button type="button" :disabled="saving" @click.stop="editCategory(category)">编辑</button>
+                    <button type="button" class="danger-action" :disabled="saving" @click.stop="deleteCategory(category)">删除</button>
+                  </span>
+                </span>
               </span>
-            </button>
+            </div>
             <div v-if="selectedEditionId && !categories.length" class="empty-state">这一届还没有具体奖项</div>
           </div>
         </article>
@@ -1188,11 +1244,13 @@ button:disabled {
   text-align: left;
 }
 
-.select-row[role="button"] {
+.select-row[role="button"],
+.category-row[role="button"] {
   cursor: pointer;
 }
 
-.select-row[role="button"]:focus-visible {
+.select-row[role="button"]:focus-visible,
+.category-row[role="button"]:focus-visible {
   outline: 2px solid #1677ff;
   outline-offset: 2px;
 }

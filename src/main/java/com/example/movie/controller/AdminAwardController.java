@@ -122,6 +122,12 @@ public class AdminAwardController {
         return awardService.updateAwardCategory(id, request);
     }
 
+    @DeleteMapping("/categories/{id}")
+    @Operation(summary = "deleteAwardCategory: Delete an award category and its nominations")
+    public void deleteAwardCategory(@PathVariable Long id) {
+        awardService.deleteAwardCategory(id);
+    }
+
     @GetMapping("/nominations")
     @Operation(summary = "getAwardNominations: List nominations for a category")
     public List<AwardNominationResponse> getAwardNominations(@RequestParam Long awardCategoryId) {

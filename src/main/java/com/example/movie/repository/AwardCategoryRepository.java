@@ -16,6 +16,10 @@ public interface AwardCategoryRepository extends JpaRepository<AwardCategory, Lo
             Long awardEditionId,
             Integer sortOrder
     );
+    List<AwardCategory> findByAwardEditionIdAndSortOrderGreaterThanOrderBySortOrderAscIdAsc(
+            Long awardEditionId,
+            Integer sortOrder
+    );
 
     @Modifying
     @Query("DELETE FROM AwardCategory ac WHERE ac.awardEdition.awardBody.id = :awardBodyId")

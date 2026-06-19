@@ -204,6 +204,26 @@ public class AwardService {
         return convertToCategoryResponse(awardCategoryRepository.save(awardCategory));
     }
 
+    @Transactional
+    public void deleteAwardCategory(Long id) {
+        AwardCategory awardCategory = awardCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Award category not found with id:" + id));
+        Long awardEditionId = awardCategory.getAwardEdition().getId();
+        Integer deletedSortOrder = awardCategory.getSortOrder();
+
+        awardNominationRepository.deleteByAwardCategoryId(id);
+        awardCategoryRepository.delete(awardCategory);
+
+        if (deletedSortOrder != null) {
+            List<AwardCategory> followingAwardCategories = awardCategoryRepository
+                    .findByAwardEditionIdAndSortOrderGreaterThanOrderBySortOrderAscIdAsc(awardEditionId, deletedSortOrder);
+            for (AwardCategory followingAwardCategory : followingAwardCategories) {
+                followingAwardCategory.setSortOrder(followingAwardCategory.getSortOrder() - 1);
+            }
+            awardCategoryRepository.saveAll(followingAwardCategories);
+        }
+    }
+
     public List<AwardNominationResponse> getAwardNominations(Long awardCategoryId) {
         return awardNominationRepository.findByAwardCategoryIdOrderBySortOrderAscIdAsc(awardCategoryId)
                 .stream()
