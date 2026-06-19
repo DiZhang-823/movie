@@ -204,3 +204,13 @@ export async function createAwardNomination(payload: AwardNominationPayload): Pr
     body: JSON.stringify(payload)
   }), 'Failed to create award nomination')
 }
+
+export async function deleteAwardNomination(id: number): Promise<void> {
+  const response = await request(`/admin/awards/nominations/${id}`, {
+    method: 'DELETE'
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(text || 'Failed to delete award nomination')
+  }
+}

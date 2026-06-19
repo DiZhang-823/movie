@@ -258,6 +258,25 @@ public class AwardService {
         return convertToNominationResponse(awardNominationRepository.save(awardNomination));
     }
 
+    @Transactional
+    public void deleteAwardNomination(Long id) {
+        AwardNomination awardNomination = awardNominationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Award nomination not found with id:" + id));
+        Long awardCategoryId = awardNomination.getAwardCategory().getId();
+        Integer deletedSortOrder = awardNomination.getSortOrder();
+
+        awardNominationRepository.delete(awardNomination);
+
+        if (deletedSortOrder != null) {
+            List<AwardNomination> followingNominations = awardNominationRepository
+                    .findByAwardCategoryIdAndSortOrderGreaterThanOrderBySortOrderAscIdAsc(awardCategoryId, deletedSortOrder);
+            for (AwardNomination followingNomination : followingNominations) {
+                followingNomination.setSortOrder(followingNomination.getSortOrder() - 1);
+            }
+            awardNominationRepository.saveAll(followingNominations);
+        }
+    }
+
     private AwardBody findAwardBody(Long awardBodyId) {
         return awardBodyRepository.findById(awardBodyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Award body not found with id:" + awardBodyId));

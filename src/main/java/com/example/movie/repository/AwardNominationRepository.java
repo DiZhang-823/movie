@@ -10,6 +10,10 @@ import java.util.List;
 
 public interface AwardNominationRepository extends JpaRepository<AwardNomination, Long> {
     List<AwardNomination> findByAwardCategoryIdOrderBySortOrderAscIdAsc(Long awardCategoryId);
+    List<AwardNomination> findByAwardCategoryIdAndSortOrderGreaterThanOrderBySortOrderAscIdAsc(
+            Long awardCategoryId,
+            Integer sortOrder
+    );
     List<AwardNomination> findByMovieIdOrderByAwardCategoryAwardEditionAwardYearDesc(Long movieId);
     List<AwardNomination> findByTvSeasonIdOrderByAwardCategoryAwardEditionAwardYearDesc(Long tvSeasonId);
     List<AwardNomination> findByPersonIdOrderByAwardCategoryAwardEditionAwardYearDesc(Long personId);

@@ -154,4 +154,10 @@ public class AdminAwardController {
     ) {
         return awardService.updateAwardNomination(id, request);
     }
+
+    @DeleteMapping("/nominations/{id}")
+    @Operation(summary = "deleteAwardNomination: Delete an award nomination")
+    public void deleteAwardNomination(@PathVariable Long id) {
+        awardService.deleteAwardNomination(id);
+    }
 }

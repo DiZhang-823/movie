@@ -8,6 +8,7 @@ import {
   deleteAwardBody,
   deleteAwardCategory,
   deleteAwardEdition,
+  deleteAwardNomination,
   getAwardBodies,
   getAwardCategories,
   getAwardEditions,
@@ -43,6 +44,7 @@ const bodyListExpanded = ref(false)
 const activeBodyMenuId = ref<number | null>(null)
 const activeEditionMenuId = ref<number | null>(null)
 const activeCategoryMenuId = ref<number | null>(null)
+const activeNominationMenuId = ref<number | null>(null)
 
 const movieQuery = ref('')
 const tvSeasonQuery = ref('')
@@ -302,6 +304,34 @@ async function saveNomination() {
   } catch (error) {
     console.error(error)
     errorMessage.value = '添加提名失败'
+  } finally {
+    saving.value = false
+  }
+}
+
+function toggleNominationMenu(nominationId: number) {
+  activeNominationMenuId.value = activeNominationMenuId.value === nominationId ? null : nominationId
+}
+
+async function deleteNomination(nomination: AwardNomination) {
+  activeNominationMenuId.value = null
+  const confirmed = window.confirm(`确认删除“${nominationTarget(nomination)}”这条提名吗？`)
+  if (!confirmed) {
+    return
+  }
+
+  saving.value = true
+  message.value = ''
+  errorMessage.value = ''
+  try {
+    await deleteAwardNomination(nomination.id)
+    if (selectedCategoryId.value) {
+      await loadNominations(selectedCategoryId.value)
+    }
+    message.value = '提名已删除，后续排序已前移'
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '删除提名失败'
   } finally {
     saving.value = false
   }
@@ -710,6 +740,7 @@ function closeBodyMenu() {
   activeBodyMenuId.value = null
   activeEditionMenuId.value = null
   activeCategoryMenuId.value = null
+  activeNominationMenuId.value = null
 }
 
 onMounted(() => {
@@ -947,10 +978,27 @@ onBeforeUnmount(() => {
               <span class="winner-badge" :class="{ muted: !nomination.winner }">
                 {{ nomination.winner ? '获奖' : '提名' }}
               </span>
-              <div>
+              <div class="preview-content">
                 <strong>{{ nominationTarget(nomination) }}</strong>
                 <small>{{ nomination.note || nomination.awardCategoryName }}</small>
               </div>
+              <span class="row-actions nomination-actions">
+                <span class="body-menu-wrap" @click.stop>
+                  <button
+                    type="button"
+                    class="body-menu-trigger"
+                    :class="{ active: activeNominationMenuId === nomination.id }"
+                    :disabled="saving"
+                    aria-label="提名操作"
+                    @click.stop="toggleNominationMenu(nomination.id)"
+                  >
+                    <span></span><span></span><span></span>
+                  </button>
+                  <span v-if="activeNominationMenuId === nomination.id" class="body-action-menu">
+                    <button type="button" class="danger-action" :disabled="saving" @click.stop="deleteNomination(nomination)">删除</button>
+                  </span>
+                </span>
+              </span>
             </div>
             <div v-if="!nominations.length" class="empty-state">选择奖项后可查看提名预览</div>
           </div>
@@ -1061,6 +1109,23 @@ onBeforeUnmount(() => {
                 <small>{{ nomination.note || nomination.awardCategoryName }}</small>
               </div>
               <em>#{{ formatSort(nomination.sortOrder) }}</em>
+              <span class="row-actions nomination-actions">
+                <span class="body-menu-wrap" @click.stop>
+                  <button
+                    type="button"
+                    class="body-menu-trigger"
+                    :class="{ active: activeNominationMenuId === nomination.id }"
+                    :disabled="saving"
+                    aria-label="提名操作"
+                    @click.stop="toggleNominationMenu(nomination.id)"
+                  >
+                    <span></span><span></span><span></span>
+                  </button>
+                  <span v-if="activeNominationMenuId === nomination.id" class="body-action-menu">
+                    <button type="button" class="danger-action" :disabled="saving" @click.stop="deleteNomination(nomination)">删除</button>
+                  </span>
+                </span>
+              </span>
             </div>
             <div v-if="selectedCategoryId && !nominations.length" class="empty-state">这个奖项还没有提名</div>
           </div>
@@ -1473,6 +1538,15 @@ button:disabled {
 .preview-row div,
 .nomination-row div {
   min-width: 0;
+}
+
+.preview-content,
+.nomination-row > div {
+  flex: 1;
+}
+
+.nomination-actions {
+  margin-left: auto;
 }
 
 .preview-row strong,
