@@ -1208,7 +1208,7 @@ button:disabled {
   color: #1677ff;
 }
 
-.select-row span:first-child,
+.select-row > span:first-child,
 .category-row strong {
   overflow: hidden;
   text-overflow: ellipsis;
