@@ -1005,7 +1005,7 @@ onBeforeUnmount(() => {
         </article>
       </section>
 
-      <section v-if="activeDetailTab === 'nominations'" class="workspace-grid">
+      <section v-if="activeDetailTab === 'nominations'" class="workspace-grid nomination-workspace">
         <article class="work-card">
           <div class="card-heading">
             <h3>添加提名</h3>
@@ -1484,6 +1484,10 @@ button:disabled {
 }
 
 .workspace-grid.single {
+  grid-template-columns: 1fr;
+}
+
+.nomination-workspace {
   grid-template-columns: 1fr;
 }
 
