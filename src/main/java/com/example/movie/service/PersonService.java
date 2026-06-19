@@ -6,9 +6,12 @@ import com.example.movie.dto.PersonMovieCreditResponse;
 import com.example.movie.entity.Movie;
 import com.example.movie.entity.MoviePerson;
 import com.example.movie.entity.Person;
+import com.example.movie.entity.TvSeason;
+import com.example.movie.entity.TvSeasonPerson;
 import com.example.movie.exception.ResourceNotFoundException;
 import com.example.movie.repository.MoviePersonRepository;
 import com.example.movie.repository.PersonRepository;
+import com.example.movie.repository.TvSeasonPersonRepository;
 import com.example.movie.tmdb.TmdbClient;
 import com.example.movie.tmdb.dto.*;
 import jakarta.transaction.Transactional;
@@ -17,6 +20,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +32,7 @@ public class PersonService {
     private final TmdbClient tmdbClient;
     private final PersonRepository personRepository;
     private final MoviePersonRepository moviePersonRepository;
+    private final TvSeasonPersonRepository tvSeasonPersonRepository;
     private static final Set<String> IMPORTANT_JOBS = Set.of(
             "director",
             "writer",
@@ -36,10 +41,12 @@ public class PersonService {
 
 
     public PersonService(TmdbClient tmdbClient, PersonRepository personRepository,
-                         MoviePersonRepository moviePersonRepository) {
+                         MoviePersonRepository moviePersonRepository,
+                         TvSeasonPersonRepository tvSeasonPersonRepository) {
         this.tmdbClient = tmdbClient;
         this.personRepository = personRepository;
         this.moviePersonRepository = moviePersonRepository;
+        this.tvSeasonPersonRepository = tvSeasonPersonRepository;
     }
 
     public TmdbPersonResponse fetchPersonByIdFromTmdb(Long personId) {
@@ -50,6 +57,7 @@ public class PersonService {
         Person person = personRepository.findById(personId)
                 .orElseThrow(() -> new ResourceNotFoundException("Person not found with id:" + personId));
         List<MoviePerson> moviePersons = moviePersonRepository.findByPersonIdWithMovieOrderByReleaseDateDesc(personId);
+        List<TvSeasonPerson> tvSeasonPersons = tvSeasonPersonRepository.findByPersonIdWithTvSeasonOrderByAirDateDesc(personId);
 
         PersonDetailResponse response = new PersonDetailResponse();
         response.setId(person.getId());
@@ -65,7 +73,12 @@ public class PersonService {
         response.setProfilePath(person.getProfilePath());
         response.setPopularity(person.getPopularity());
 
-        List<PersonMovieCreditResponse> credits = convertToMovieCredits(moviePersons);
+        List<PersonMovieCreditResponse> credits = new ArrayList<>();
+        credits.addAll(convertToMovieCredits(moviePersons));
+        credits.addAll(convertToTvSeasonCredits(tvSeasonPersons));
+        credits.sort(Comparator
+                .comparing(PersonMovieCreditResponse::getReleaseDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(PersonMovieCreditResponse::getWorkId, Comparator.reverseOrder()));
         response.setMovieCreditCount(credits.size());
         response.setCredits(credits);
 
@@ -173,7 +186,9 @@ public class PersonService {
         for (MoviePerson moviePerson : moviePersons) {
             Movie movie = moviePerson.getMovie();
             PersonMovieCreditResponse credit = creditsByMovieId.computeIfAbsent(movie.getId(), movieId -> {
-                PersonMovieCreditResponse item = new PersonMovieCreditResponse();
+            PersonMovieCreditResponse item = new PersonMovieCreditResponse();
+                item.setWorkId(movie.getId());
+                item.setMediaType("MOVIE");
                 item.setMovieId(movie.getId());
                 item.setTmdbId(movie.getTmdbId());
                 item.setTitle(movie.getTitle());
@@ -199,6 +214,42 @@ public class PersonService {
         }
 
         return new ArrayList<>(creditsByMovieId.values());
+    }
+
+    private List<PersonMovieCreditResponse> convertToTvSeasonCredits(List<TvSeasonPerson> tvSeasonPersons) {
+        Map<Long, PersonMovieCreditResponse> creditsByTvSeasonId = new LinkedHashMap<>();
+
+        for (TvSeasonPerson tvSeasonPerson : tvSeasonPersons) {
+            TvSeason tvSeason = tvSeasonPerson.getTvSeason();
+            PersonMovieCreditResponse credit = creditsByTvSeasonId.computeIfAbsent(tvSeason.getId(), tvSeasonId -> {
+                PersonMovieCreditResponse item = new PersonMovieCreditResponse();
+                item.setWorkId(tvSeason.getId());
+                item.setMediaType("TV");
+                item.setTvSeasonId(tvSeason.getId());
+                item.setTmdbId(tvSeason.getTmdbTvId());
+                item.setTitle(tvSeason.getTitle());
+                item.setOriginalTitle(tvSeason.getOriginalTitle());
+                item.setReleaseDate(tvSeason.getAirDate());
+                item.setVoteAverage(tvSeason.getVoteAverage());
+                item.setVoteCount(tvSeason.getVoteCount());
+                item.setImdbVoteAverage(tvSeason.getImdbVoteAverage());
+                item.setImdbVoteCount(tvSeason.getImdbVoteCount());
+                item.setImdbRatingUpdatedAt(tvSeason.getImdbRatingUpdatedAt());
+                item.setPosterPath(tvSeason.getPosterPath());
+                item.setJobs(new ArrayList<>());
+                return item;
+            });
+
+            if (hasText(tvSeasonPerson.getJob())
+                    && credit.getJobs().stream().noneMatch(job -> job.equalsIgnoreCase(tvSeasonPerson.getJob()))) {
+                credit.getJobs().add(tvSeasonPerson.getJob());
+            }
+            if (!hasText(credit.getCharacter()) && hasText(tvSeasonPerson.getCharacterName())) {
+                credit.setCharacter(tvSeasonPerson.getCharacterName());
+            }
+        }
+
+        return new ArrayList<>(creditsByTvSeasonId.values());
     }
 
     private PersonItemResponse convertToPersonItemResponse(Person person) {

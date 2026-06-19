@@ -212,6 +212,14 @@ function getDisplayVoteAverage(credit: PersonMovieCredit) {
   return credit.imdbVoteAverage ?? credit.voteAverage
 }
 
+function getCreditLink(credit: PersonMovieCredit) {
+  return credit.mediaType === 'TV' ? `/tv-seasons/${credit.workId}` : `/movies/${credit.workId}`
+}
+
+function getMediaTypeLabel(credit: PersonMovieCredit) {
+  return credit.mediaType === 'TV' ? '剧集' : '电影'
+}
+
 function formatPopularity(value: number | null | undefined) {
   if (value === null || value === undefined) {
     return '暂无'
@@ -409,9 +417,9 @@ onBeforeUnmount(() => {
             <div v-if="filteredCredits.length > 0" class="work-grid">
               <RouterLink
                 v-for="credit in filteredCredits"
-                :key="credit.movieId"
+                :key="`${credit.mediaType}-${credit.workId}`"
                 class="work-card"
-                :to="`/movies/${credit.movieId}`"
+                :to="getCreditLink(credit)"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -422,6 +430,7 @@ onBeforeUnmount(() => {
                     :alt="credit.title"
                   />
                   <div v-else class="work-poster placeholder">No Image</div>
+                  <span class="media-type">{{ getMediaTypeLabel(credit) }}</span>
                   <span class="credit-role">{{ getCreditRole(credit) }}</span>
                 </div>
                 <div class="work-title">{{ credit.title }}</div>
@@ -441,16 +450,16 @@ onBeforeUnmount(() => {
             <div class="top-list">
               <RouterLink
                 v-for="(credit, index) in topRatedCredits"
-                :key="`top-${credit.movieId}`"
+                :key="`top-${credit.mediaType}-${credit.workId}`"
                 class="top-item"
-                :to="`/movies/${credit.movieId}`"
+                :to="getCreditLink(credit)"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <span class="top-rank">{{ index + 1 }}</span>
                 <span class="top-info">
                   <strong>{{ credit.title }}</strong>
-                  <em>{{ getCreditRole(credit) }}</em>
+                  <em>{{ getMediaTypeLabel(credit) }} · {{ getCreditRole(credit) }}</em>
                 </span>
                 <span class="top-score">{{ formatVoteAverage(getDisplayVoteAverage(credit)) }}</span>
               </RouterLink>
@@ -789,6 +798,19 @@ onBeforeUnmount(() => {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.media-type {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(12, 20, 33, 0.76);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .work-title {

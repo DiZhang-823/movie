@@ -10,7 +10,10 @@ import java.util.List;
 @Data
 public class PersonMovieCreditResponse {
 
+    private Long workId;
+    private String mediaType;
     private Long movieId;
+    private Long tvSeasonId;
     private Long tmdbId;
     private String title;
     private String originalTitle;

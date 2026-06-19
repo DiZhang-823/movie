@@ -1,7 +1,10 @@
 import { request } from '../utils/request'
 
 export type PersonMovieCredit = {
-    movieId: number
+    workId: number
+    mediaType: 'MOVIE' | 'TV'
+    movieId: number | null
+    tvSeasonId: number | null
     tmdbId: number
     title: string
     originalTitle: string | null
