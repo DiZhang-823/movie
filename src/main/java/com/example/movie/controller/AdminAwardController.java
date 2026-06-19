@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -53,6 +54,12 @@ public class AdminAwardController {
             @Valid @RequestBody AwardBodyRequest request
     ) {
         return awardService.updateAwardBody(id, request);
+    }
+
+    @DeleteMapping("/bodies/{id}")
+    @Operation(summary = "deleteAwardBody: Delete an award body and its nested award data")
+    public void deleteAwardBody(@PathVariable Long id) {
+        awardService.deleteAwardBody(id);
     }
 
     @GetMapping("/editions")

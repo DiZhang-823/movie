@@ -121,6 +121,16 @@ export async function updateAwardBody(id: number, payload: AwardBodyPayload): Pr
   }), 'Failed to update award body')
 }
 
+export async function deleteAwardBody(id: number): Promise<void> {
+  const response = await request(`/admin/awards/bodies/${id}`, {
+    method: 'DELETE'
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(text || 'Failed to delete award body')
+  }
+}
+
 export async function getAwardEditions(awardBodyId?: number): Promise<AwardEdition[]> {
   const suffix = awardBodyId ? `?awardBodyId=${awardBodyId}` : ''
   return parseResponse(await request(`/admin/awards/editions${suffix}`), 'Failed to load award editions')

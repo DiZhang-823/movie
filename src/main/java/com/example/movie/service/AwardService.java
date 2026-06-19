@@ -94,6 +94,27 @@ public class AwardService {
         return convertToBodyResponse(awardBodyRepository.save(awardBody));
     }
 
+    @Transactional
+    public void deleteAwardBody(Long id) {
+        AwardBody awardBody = awardBodyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Award body not found with id:" + id));
+        Integer deletedSortOrder = awardBody.getSortOrder();
+
+        awardNominationRepository.deleteByAwardBodyId(id);
+        awardCategoryRepository.deleteByAwardBodyId(id);
+        awardEditionRepository.deleteByAwardBodyId(id);
+        awardBodyRepository.delete(awardBody);
+
+        if (deletedSortOrder != null) {
+            List<AwardBody> followingAwardBodies = awardBodyRepository
+                    .findBySortOrderGreaterThanOrderBySortOrderAscIdAsc(deletedSortOrder);
+            for (AwardBody followingAwardBody : followingAwardBodies) {
+                followingAwardBody.setSortOrder(followingAwardBody.getSortOrder() - 1);
+            }
+            awardBodyRepository.saveAll(followingAwardBodies);
+        }
+    }
+
     public List<AwardEditionResponse> getAwardEditions(Long awardBodyId) {
         List<AwardEdition> awardEditions = awardBodyId == null
                 ? awardEditionRepository.findAllByOrderByAwardYearDescEditionNumberDescIdDesc()

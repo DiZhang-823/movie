@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   createAwardBody,
   createAwardCategory,
   createAwardEdition,
   createAwardNomination,
+  deleteAwardBody,
   getAwardBodies,
   getAwardCategories,
   getAwardEditions,
@@ -37,6 +38,7 @@ const saving = ref(false)
 const message = ref('')
 const errorMessage = ref('')
 const bodyListExpanded = ref(false)
+const activeBodyMenuId = ref<number | null>(null)
 
 const movieQuery = ref('')
 const tvSeasonQuery = ref('')
@@ -302,11 +304,44 @@ async function saveNomination() {
 }
 
 function editBody(body: AwardBody) {
+  activeBodyMenuId.value = null
   editingBodyId.value = body.id
   bodyForm.name = body.name
   bodyForm.originalName = body.originalName ?? ''
   bodyForm.sortOrder = body.sortOrder
   bodyForm.description = body.description ?? ''
+}
+
+function toggleBodyMenu(bodyId: number) {
+  activeBodyMenuId.value = activeBodyMenuId.value === bodyId ? null : bodyId
+}
+
+async function deleteBody(body: AwardBody) {
+  activeBodyMenuId.value = null
+  const confirmed = window.confirm(`确认删除“${body.name}”吗？该品牌下的届数、具体奖项和提名也会一并删除。`)
+  if (!confirmed) {
+    return
+  }
+
+  saving.value = true
+  message.value = ''
+  errorMessage.value = ''
+  try {
+    await deleteAwardBody(body.id)
+    if (editingBodyId.value === body.id) {
+      cancelBodyEdit()
+    }
+    if (selectedBodyId.value === body.id) {
+      selectedBodyId.value = null
+    }
+    await loadAwards()
+    message.value = '奖项品牌已删除，后续排序已前移'
+  } catch (error) {
+    console.error(error)
+    errorMessage.value = '删除奖项品牌失败'
+  } finally {
+    saving.value = false
+  }
 }
 
 function editEdition(edition: AwardEdition) {
@@ -597,8 +632,17 @@ function tvSeasonLabel(tvSeason: TvSeasonItem) {
   return `${tvSeason.showName} 第${tvSeason.seasonNumber}季 · ${tvSeason.title}`
 }
 
+function closeBodyMenu() {
+  activeBodyMenuId.value = null
+}
+
 onMounted(() => {
+  document.addEventListener('click', closeBodyMenu)
   loadAwards()
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeBodyMenu)
 })
 </script>
 
@@ -628,21 +672,39 @@ onMounted(() => {
         </form>
 
         <div class="select-list body-select-list" :class="{ expanded: bodyListExpanded || !bodyListCollapsible }">
-          <button
+          <div
             v-for="(body, index) in bodies"
             :key="body.id"
             class="select-row"
             :class="{ active: body.id === selectedBodyId }"
+            role="button"
+            tabindex="0"
             @click="selectedBodyId = body.id"
+            @keydown.enter="selectedBodyId = body.id"
           >
             <span>{{ body.name }}</span>
             <em>#{{ formatSort(body.sortOrder) }}</em>
             <span class="row-actions">
               <button type="button" :disabled="index === 0 || saving" @click.stop="moveBody(index, -1)">↑</button>
               <button type="button" :disabled="index === bodies.length - 1 || saving" @click.stop="moveBody(index, 1)">↓</button>
-              <button type="button" @click.stop="editBody(body)">编辑</button>
+              <span class="body-menu-wrap" @click.stop>
+                <button
+                  type="button"
+                  class="body-menu-trigger"
+                  :class="{ active: activeBodyMenuId === body.id }"
+                  :disabled="saving"
+                  aria-label="奖项品牌操作"
+                  @click.stop="toggleBodyMenu(body.id)"
+                >
+                  <span></span><span></span><span></span>
+                </button>
+                <span v-if="activeBodyMenuId === body.id" class="body-action-menu">
+                  <button type="button" :disabled="saving" @click.stop="editBody(body)">编辑</button>
+                  <button type="button" class="danger-action" :disabled="saving" @click.stop="deleteBody(body)">删除</button>
+                </span>
+              </span>
             </span>
-          </button>
+          </div>
           <div v-if="!bodies.length" class="empty-line">暂无奖项品牌</div>
         </div>
 
@@ -1107,6 +1169,75 @@ button:disabled {
   font-size: 13px;
   min-height: 28px;
   padding: 0 8px;
+}
+
+.body-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.body-menu-trigger {
+  width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  border: 1px solid #dbe2ea;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.body-menu-trigger:hover,
+.body-menu-trigger.active {
+  border-color: #9fc5ff;
+  background: #eef5ff;
+}
+
+.body-menu-trigger span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #526171;
+}
+
+.body-action-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  width: 92px;
+  padding: 5px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+}
+
+.body-action-menu button {
+  min-height: 32px;
+  padding: 0 9px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #374151;
+  font-size: 13px;
+  text-align: left;
+}
+
+.body-action-menu button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.body-action-menu .danger-action {
+  color: #dc2626;
+}
+
+.body-action-menu .danger-action:hover:not(:disabled) {
+  background: #fef2f2;
 }
 
 .award-workspace {

@@ -10,4 +10,5 @@ public interface AwardBodyRepository extends JpaRepository<AwardBody, Long> {
     Optional<AwardBody> findByName(String name);
     List<AwardBody> findAllByOrderBySortOrderAscIdAsc();
     List<AwardBody> findBySortOrderGreaterThanEqualOrderBySortOrderDesc(Integer sortOrder);
+    List<AwardBody> findBySortOrderGreaterThanOrderBySortOrderAscIdAsc(Integer sortOrder);
 }
