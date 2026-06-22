@@ -641,6 +641,12 @@ function handleJumpPage() {
   jumpPage.value = ''
 }
 
+function handlePageSizeChange() {
+  page.value = 0
+  jumpPage.value = ''
+  loadMovies()
+}
+
 function getPosterUrl(path: string | null) {
   if (!path) {
     return ''
@@ -1390,7 +1396,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="pagination">
-      <button :disabled="page === 0" @click="goToPreviousPage">上一页</button>
+      <button class="pagination-nav pagination-previous" :disabled="page === 0" @click="goToPreviousPage">上一页</button>
 
       <span
           v-for="(item, index) in visiblePages"
@@ -1405,7 +1411,7 @@ onBeforeUnmount(() => {
         {{ typeof item === 'number' ? item + 1 : item }}
       </span>
 
-      <button :disabled="page >= totalPages - 1" @click="goToNextPage">下一页</button>
+      <button class="pagination-nav pagination-next" :disabled="page >= totalPages - 1" @click="goToNextPage">下一页</button>
 
       <div class="jump-box">
         <span>跳至</span>
@@ -1413,6 +1419,16 @@ onBeforeUnmount(() => {
         <span>页</span>
         <button @click="handleJumpPage">确定</button>
       </div>
+
+      <label class="page-size-control">
+        <span>每页</span>
+        <select v-model.number="size" @change="handlePageSizeChange">
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+          <option :value="100">100</option>
+        </select>
+        <span>条</span>
+      </label>
     </div>
   </div>
 </template>
@@ -2284,6 +2300,32 @@ onBeforeUnmount(() => {
   margin-left: 8px;
 }
 
+.page-size-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.page-size-control select {
+  width: 66px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+}
+
+.page-size-control select:focus {
+  border-color: #1677ff;
+  outline: none;
+}
+
 .jump-box input {
   width: 60px;
   height: 36px;
@@ -2539,12 +2581,12 @@ onBeforeUnmount(() => {
     gap: 6px;
   }
 
-  .pagination button:first-of-type {
+  .pagination-previous {
     order: 1;
     flex: 1 0 calc(50% - 3px);
   }
 
-  .pagination button:last-of-type {
+  .pagination-next {
     order: 2;
     flex: 1 0 calc(50% - 3px);
   }
@@ -2567,6 +2609,16 @@ onBeforeUnmount(() => {
     width: 100%;
     margin-left: 0;
     justify-content: flex-start;
+  }
+
+  .page-size-control {
+    order: 5;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .page-size-control select {
+    height: 32px;
   }
 }
 
