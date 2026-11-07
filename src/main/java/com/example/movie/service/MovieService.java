@@ -365,6 +365,14 @@ public class MovieService {
         return this.convertToDetailResponse(movie);
     }
 
+    @Transactional
+    public MovieDetailResponse updateMovieTitle(Long id, String title) {
+        Movie movie = movieRepository.findDetailById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Movie not found with id:" + id));
+        movie.setTitle(title.trim());
+        return convertToDetailResponse(movie);
+    }
+
     private boolean shouldUseUserMovieDefaultSort(
             MovieQuery movieQuery,
             Long currentUserId,

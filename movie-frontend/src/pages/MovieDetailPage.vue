@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getMovieById, type MovieCollectionItem, type MovieDetail, type PersonItem } from '@/api/movie'
+import { getMovieById, updateMovieTitle, type MovieCollectionItem, type MovieDetail, type PersonItem } from '@/api/movie'
 import { getUserMovie, saveUserMovie, type UserMovieResponse } from '@/api/userMovie'
 import { isLoggedIn } from '@/utils/auth'
+import { request } from '@/utils/request'
 
 type DisplayRatingSource = {
   voteAverage?: number | null
@@ -24,6 +25,11 @@ const castListMaxHeight = ref('none')
 
 const userMovie = ref<UserMovieResponse | null>(null)
 const isUserLoggedIn = ref(isLoggedIn())
+const isAdmin = ref(false)
+const isEditingTitle = ref(false)
+const editableTitle = ref('')
+const savingTitle = ref(false)
+const titleError = ref('')
 
 const showWatchedPanel = ref(false)
 const watchedRating = ref<number | null>(null)
@@ -103,6 +109,10 @@ async function loadMovieDetail() {
 
 async function loadDetailPage() {
   isUserLoggedIn.value = isLoggedIn()
+  isAdmin.value = false
+  isEditingTitle.value = false
+  editableTitle.value = ''
+  titleError.value = ''
   visibleCastCount.value = 12
   castListMaxHeight.value = 'none'
   collectionExpanded.value = false
@@ -123,9 +133,70 @@ async function loadDetailPage() {
   }
 
   try {
+    await loadAdminStatus()
     userMovie.value = await getUserMovie(movie.value.id, token)
   } catch (e) {
     console.error(e)
+  }
+}
+
+async function loadAdminStatus() {
+  isAdmin.value = false
+  if (!isUserLoggedIn.value) {
+    return
+  }
+
+  try {
+    const response = await request('/users/me')
+    if (!response.ok) {
+      return
+    }
+    const data = await response.json()
+    isAdmin.value = Boolean(data.isAdmin)
+  } catch (error) {
+    console.error(error)
+    isAdmin.value = false
+  }
+}
+
+function startTitleEdit() {
+  if (!movie.value || !isAdmin.value) {
+    return
+  }
+  editableTitle.value = movie.value.title
+  titleError.value = ''
+  isEditingTitle.value = true
+}
+
+function cancelTitleEdit() {
+  isEditingTitle.value = false
+  editableTitle.value = ''
+  titleError.value = ''
+}
+
+async function saveTitleEdit() {
+  if (!movie.value || savingTitle.value) {
+    return
+  }
+
+  const nextTitle = editableTitle.value.trim()
+  if (!nextTitle) {
+    titleError.value = '标题不能为空'
+    return
+  }
+
+  savingTitle.value = true
+  titleError.value = ''
+
+  try {
+    movie.value = await updateMovieTitle(movie.value.id, nextTitle)
+    document.title = `${movie.value.title} - 详情`
+    cancelTitleEdit()
+  } catch (error) {
+    console.error(error)
+    titleError.value = '保存失败'
+  } finally {
+    savingTitle.value = false
   }
 }
 
@@ -458,9 +529,30 @@ watch(() => route.params.id, () => {
 
           <div class="hero-summary">
             <div class="title-row">
-              <h1>{{ movie.title }}</h1>
+              <template v-if="isEditingTitle">
+                <input
+                  v-model="editableTitle"
+                  class="title-edit-input"
+                  type="text"
+                  maxlength="255"
+                  :disabled="savingTitle"
+                  @keyup.enter="saveTitleEdit"
+                  @keyup.esc="cancelTitleEdit"
+                />
+                <button class="title-edit-save" type="button" :disabled="savingTitle" @click="saveTitleEdit">
+                  {{ savingTitle ? '保存中' : '保存' }}
+                </button>
+                <button class="title-edit-cancel" type="button" :disabled="savingTitle" @click="cancelTitleEdit">
+                  取消
+                </button>
+              </template>
+              <template v-else>
+                <h1>{{ movie.title }}</h1>
+                <button v-if="isAdmin" class="title-edit-trigger" type="button" @click="startTitleEdit">编辑</button>
+              </template>
               <span class="release-year">{{ releaseYear }}</span>
             </div>
+            <div v-if="titleError" class="title-edit-error">{{ titleError }}</div>
             <div class="original-title">{{ movie.originalTitle || '原名未知' }}</div>
 
             <div class="meta-tags">
@@ -918,6 +1010,60 @@ watch(() => route.params.id, () => {
   color: rgba(255, 255, 255, 0.64);
   font-size: 28px;
   font-weight: 700;
+}
+
+.title-edit-trigger,
+.title-edit-save,
+.title-edit-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 0 14px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.title-edit-save {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+}
+
+.title-edit-cancel {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.title-edit-save:disabled,
+.title-edit-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.title-edit-input {
+  width: min(560px, 100%);
+  min-width: 240px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 10px;
+  padding: 7px 12px;
+  color: #fff;
+  background: rgba(4, 11, 18, 0.44);
+  font-size: 40px;
+  line-height: 1.15;
+  font-weight: 800;
+  outline: none;
+}
+
+.title-edit-input:focus {
+  border-color: rgba(77, 148, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.24);
+}
+
+.title-edit-error {
+  margin-top: 6px;
+  color: #ffb4a8;
+  font-size: 13px;
 }
 
 .original-title {
@@ -1813,6 +1959,21 @@ watch(() => route.params.id, () => {
   .title-row h1 {
     font-size: 25px;
     line-height: 1.18;
+  }
+
+  .title-edit-input {
+    min-width: 0;
+    flex: 1 1 100%;
+    font-size: 25px;
+    padding: 6px 9px;
+  }
+
+  .title-edit-trigger,
+  .title-edit-save,
+  .title-edit-cancel {
+    min-height: 28px;
+    padding: 0 11px;
+    font-size: 12px;
   }
 
   .release-year {

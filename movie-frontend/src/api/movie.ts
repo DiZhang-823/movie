@@ -157,6 +157,19 @@ export async function getMovieById(id: number): Promise<MovieDetail> {
     return response.json()
 }
 
+export async function updateMovieTitle(id: number, title: string): Promise<MovieDetail> {
+    const response = await request(`/admin/movies/${id}/title`, {
+        method: 'PUT',
+        body: JSON.stringify({ title })
+    })
+
+    if (!response.ok) {
+        throw new Error('更新电影标题失败')
+    }
+
+    return response.json()
+}
+
 export async function deleteMovie(id: number): Promise<void> {
     const response = await request(`/admin/movies/${id}`, {
         method: 'DELETE'

@@ -200,6 +200,29 @@ public class TvSeasonService {
     }
 
     @Transactional
+    public TvSeasonDetailResponse updateTvSeasonTitle(Long id, String title, String showName) {
+        TvSeason tvSeason = tvSeasonRepository.findDetailById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("TV season not found with id:" + id));
+        String trimmedTitle = title.trim();
+        String trimmedShowName = showName.trim();
+        String oldShowName = tvSeason.getShowName();
+        List<TvSeason> seasons = tvSeasonRepository.findByTmdbTvIdOrderBySeasonNumberAsc(tvSeason.getTmdbTvId());
+
+        for (TvSeason item : seasons) {
+            item.setShowName(trimmedShowName);
+            if (item.getId().equals(tvSeason.getId())) {
+                item.setTitle(trimmedTitle);
+            } else {
+                item.setTitle(replaceShowNamePrefix(item.getTitle(), oldShowName, trimmedShowName));
+            }
+        }
+
+        tvSeason.setTitle(trimmedTitle);
+        tvSeason.setShowName(trimmedShowName);
+        return convertToDetailResponse(tvSeason);
+    }
+
+    @Transactional
     public void deleteTvSeason(Long id) {
         TvSeason tvSeason = tvSeasonRepository.findDetailById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("TV season not found with id:" + id));
@@ -429,6 +452,14 @@ public class TvSeasonService {
             return title.substring(titlePrefix.length());
         }
         return hasText(title) ? title : "第" + tvSeason.getSeasonNumber() + "季";
+    }
+
+    private String replaceShowNamePrefix(String title, String oldShowName, String newShowName) {
+        String oldTitlePrefix = oldShowName + " ";
+        if (hasText(title) && hasText(oldShowName) && title.startsWith(oldTitlePrefix)) {
+            return newShowName + " " + title.substring(oldTitlePrefix.length()).trim();
+        }
+        return title;
     }
 
     private PersonItemResponse convertToPersonItemResponse(TvSeasonPerson tvSeasonPerson) {

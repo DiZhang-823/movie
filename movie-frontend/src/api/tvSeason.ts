@@ -129,6 +129,19 @@ export async function getTvSeasonById(id: number): Promise<TvSeasonDetail> {
   return response.json()
 }
 
+export async function updateTvSeasonTitle(id: number, title: string, showName: string): Promise<TvSeasonDetail> {
+  const response = await request(`/admin/tv-seasons/${id}/title`, {
+    method: 'PUT',
+    body: JSON.stringify({ title, showName })
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to update TV season title')
+  }
+
+  return response.json()
+}
+
 export async function deleteTvSeason(id: number): Promise<void> {
   const response = await request(`/admin/tv-seasons/${id}`, {
     method: 'DELETE'

@@ -9,7 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Component
@@ -89,12 +89,18 @@ public class TmdbTvSeasonImportScheduler {
     }
 
     private boolean shouldRunNow(ImportProgress progress) {
-        LocalDateTime updatedAt = progress.getUpdatedAt();
+        Instant updatedAt = progress.getUpdatedAt();
         if (updatedAt == null) {
             return true;
         }
 
-        return !updatedAt.plusSeconds(resolveIntervalSeconds(progress)).isAfter(LocalDateTime.now());
+        Instant now = Instant.now();
+        if (updatedAt.isAfter(now)) {
+            log.warn("Import progress updated_at is in the future. taskName={}, updatedAt={}, now={}",
+                    progress.getTaskName(), updatedAt, now);
+            return true;
+        }
+        return !updatedAt.plusSeconds(resolveIntervalSeconds(progress)).isAfter(now);
     }
 
     private int resolveIntervalSeconds(ImportProgress progress) {

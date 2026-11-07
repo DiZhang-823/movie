@@ -75,12 +75,14 @@ const selectedStatus = ref<{ value: UserStatusFilter | null; name: string }>(sta
 const tvSeasons = ref<TvSeasonItem[]>([])
 const loading = ref(false)
 const errorMessage = ref('')
+const filtersCollapsed = ref(false)
 const page = ref(0)
 const size = ref(20)
 const totalPages = ref(0)
 const totalElements = ref(0)
 const savingId = ref<number | null>(null)
 const batchDeleting = ref(false)
+const batchMarkingNotInterested = ref(false)
 const activeActionSeasonId = ref<number | null>(null)
 const watchedEditorSeasonId = ref<number | null>(null)
 const watchedRating = ref<number | null>(null)
@@ -109,6 +111,34 @@ const olderYears = computed(() => years.value.slice(10))
 const isOlderYearSelected = computed(() =>
   selectedYear.value !== null && !recentYears.value.includes(selectedYear.value)
 )
+const filterSummaryItems = computed(() => {
+  const items: string[] = []
+  if (selectedCategory.value.name !== '全部') {
+    items.push(selectedCategory.value.name)
+  }
+  if (selectedRegion.value.name !== '全部') {
+    items.push(selectedRegion.value.name)
+  }
+  if (selectedYear.value !== null) {
+    items.push(String(selectedYear.value))
+  }
+  if (isUserLoggedIn.value && selectedStatus.value.name !== '默认') {
+    items.push(selectedStatus.value.name)
+  }
+  if (hasUserRatingRangeFilter.value) {
+    items.push(`我的评分${userRatingRangeLabel.value}`)
+  }
+  if (hasRatingRangeFilter.value) {
+    items.push(ratingRangeLabel.value)
+  }
+  if (selectedSort.value.name !== '默认') {
+    items.push(`${selectedSort.value.name}排序`)
+  }
+  if (keyword.value.trim()) {
+    items.push(`搜索：${keyword.value.trim()}`)
+  }
+  return items.length > 0 ? items : ['全部']
+})
 const hasRatingRangeFilter = computed(() => ratingMin.value !== 0 || ratingMax.value !== 10)
 const ratingRangeLabel = computed(() => {
   if (!hasRatingRangeFilter.value) {
@@ -682,12 +712,18 @@ async function handleDeleteSeason(item: TvSeasonItem) {
 }
 
 async function handleDeleteCurrentPageSeasons() {
-  if (!isAdmin.value || batchDeleting.value || savingId.value !== null || tvSeasons.value.length === 0) {
+  if (
+    !isAdmin.value
+    || batchDeleting.value
+    || batchMarkingNotInterested.value
+    || savingId.value !== null
+    || tvSeasons.value.length === 0
+  ) {
     return
   }
 
   const currentSeasons = [...tvSeasons.value]
-  const confirmed = window.confirm(`确认删除本页显示的 ${currentSeasons.length} 个剧集季吗？`)
+  const confirmed = window.confirm(`确认删除本页显示的 ${currentSeasons.length} 个剧集吗？`)
   if (!confirmed) {
     return
   }
@@ -713,6 +749,43 @@ async function handleDeleteCurrentPageSeasons() {
     await loadTvSeasons()
   } finally {
     batchDeleting.value = false
+  }
+}
+
+async function handleMarkCurrentPageSeasonsNotInterested() {
+  const token = getToken()
+  if (
+    !isAdmin.value
+    || !token
+    || batchDeleting.value
+    || batchMarkingNotInterested.value
+    || savingId.value !== null
+    || tvSeasons.value.length === 0
+  ) {
+    return
+  }
+
+  const currentSeasons = [...tvSeasons.value]
+  const confirmed = window.confirm(`确认把本页显示的 ${currentSeasons.length} 个剧集全部标记为不想看吗？`)
+  if (!confirmed) {
+    return
+  }
+
+  batchMarkingNotInterested.value = true
+  closeActionPanels()
+
+  try {
+    for (const item of currentSeasons) {
+      await saveUserTvSeason(item.id, { status: 'NOT_INTERESTED' }, token)
+    }
+
+    await loadTvSeasons()
+  } catch (error) {
+    console.error(error)
+    window.alert('标记本页剧集失败，请稍后再试')
+    await loadTvSeasons()
+  } finally {
+    batchMarkingNotInterested.value = false
   }
 }
 
@@ -773,7 +846,29 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="tv-page">
-    <section class="filter-panel">
+    <section class="filter-panel" :class="{ collapsed: filtersCollapsed }">
+      <div class="filter-panel-header">
+        <strong class="filter-panel-title">筛选条件</strong>
+        <div v-if="filtersCollapsed" class="filter-summary-inline">
+          <span
+            v-for="item in filterSummaryItems"
+            :key="item"
+            class="filter-summary-item"
+          >
+            {{ item }}
+          </span>
+        </div>
+        <button
+          type="button"
+          class="filter-collapse-button"
+          @click="filtersCollapsed = !filtersCollapsed"
+        >
+          {{ filtersCollapsed ? '展开' : '收起' }}
+          <span class="filter-collapse-arrow" :class="{ expanded: filtersCollapsed }"></span>
+        </button>
+      </div>
+
+      <div v-if="!filtersCollapsed" class="filter-content">
       <div class="filter-row">
         <span class="label">类型：</span>
         <div class="options">
@@ -1031,19 +1126,35 @@ onBeforeUnmount(() => {
           <input v-model="keyword" class="search-input" type="search" placeholder="搜索剧名或季标题" />
         </div>
       </div>
+      </div>
     </section>
 
     <div class="list-toolbar">
-      <div class="summary">共 {{ totalElements }} 个剧集季</div>
-      <button
-        v-if="isAdmin"
-        type="button"
-        class="bulk-delete-btn"
-        :disabled="loading || batchDeleting || tvSeasons.length === 0"
-        @click="handleDeleteCurrentPageSeasons"
-      >
-        {{ batchDeleting ? '删除中' : '删除本页' }}
-      </button>
+      <div class="summary">共 {{ totalElements }} 个剧集
+        <span v-if="selectedCategory.name !== '全部'">｜当前类型：{{ selectedCategory.name }}</span>
+        <span v-if="selectedYear !== null">｜当前年份：{{ selectedYear }}</span>
+        <span v-if="selectedRegion.name !== '全部'">｜当前地区：{{ selectedRegion.name }}</span>
+        <span v-if="hasRatingRangeFilter">｜当前评分：{{ ratingRangeLabel }}</span>
+        <span v-if="selectedSort.name !== '默认'">｜当前排序：{{ selectedSort.name }}</span>
+      </div>
+      <div v-if="isAdmin" class="bulk-actions">
+        <button
+          type="button"
+          class="bulk-action-btn bulk-not-interested-btn"
+          :disabled="loading || batchDeleting || batchMarkingNotInterested || tvSeasons.length === 0"
+          @click="handleMarkCurrentPageSeasonsNotInterested"
+        >
+          {{ batchMarkingNotInterested ? '标记中' : '不想看本页' }}
+        </button>
+        <button
+          type="button"
+          class="bulk-action-btn bulk-delete-btn"
+          :disabled="loading || batchDeleting || batchMarkingNotInterested || tvSeasons.length === 0"
+          @click="handleDeleteCurrentPageSeasons"
+        >
+          {{ batchDeleting ? '删除中' : '删除本页' }}
+        </button>
+      </div>
     </div>
     <div v-if="loading" class="status">正在加载...</div>
     <div v-else-if="errorMessage" class="status error">{{ errorMessage }}</div>
@@ -1257,6 +1368,84 @@ onBeforeUnmount(() => {
   padding: 16px;
   border-radius: 8px;
   background: #fff;
+}
+
+.filter-panel.collapsed {
+  padding: 16px;
+}
+
+.filter-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 28px;
+}
+
+.filter-panel-title {
+  flex-shrink: 0;
+  color: #111827;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.filter-summary-inline {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.filter-summary-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filter-summary-item + .filter-summary-item::before {
+  content: '·';
+  margin-right: 10px;
+  color: #9ca3af;
+}
+
+.filter-collapse-button {
+  flex-shrink: 0;
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #1677ff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.filter-collapse-button:hover {
+  color: #0958d9;
+}
+
+.filter-collapse-arrow {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(2px) rotate(225deg);
+}
+
+.filter-collapse-arrow.expanded {
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.filter-content {
+  margin-top: 16px;
 }
 
 .filter-row {
@@ -1596,17 +1785,40 @@ onBeforeUnmount(() => {
   margin: 2px 0 12px;
 }
 
-.bulk-delete-btn {
+.bulk-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bulk-action-btn {
   flex: 0 0 auto;
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid #fecaca;
   border-radius: 999px;
-  background: #fef2f2;
-  color: #dc2626;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.bulk-not-interested-btn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.bulk-not-interested-btn:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.bulk-delete-btn {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .bulk-delete-btn:hover:not(:disabled) {
@@ -1614,7 +1826,7 @@ onBeforeUnmount(() => {
   border-color: #fca5a5;
 }
 
-.bulk-delete-btn:disabled {
+.bulk-action-btn:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -2218,6 +2430,31 @@ onBeforeUnmount(() => {
   .filter-panel {
     padding: 12px;
     border-radius: 8px;
+  }
+
+  .filter-panel-header {
+    gap: 10px;
+  }
+
+  .filter-panel-title {
+    font-size: 18px;
+  }
+
+  .filter-summary-inline {
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .filter-summary-item + .filter-summary-item::before {
+    margin-right: 6px;
+  }
+
+  .filter-collapse-button {
+    font-size: 13px;
+  }
+
+  .filter-content {
+    margin-top: 12px;
   }
 
   .filter-row {

@@ -1,10 +1,11 @@
 ﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getTvSeasonById, type TvSeasonCollectionItem, type TvSeasonDetail } from '../api/tvSeason'
+import { getTvSeasonById, updateTvSeasonTitle, type TvSeasonCollectionItem, type TvSeasonDetail } from '../api/tvSeason'
 import { getUserTvSeason, saveUserTvSeason, type UserTvSeasonResponse } from '../api/userTvSeason'
 import type { PersonItem } from '../api/movie'
 import { getToken, isLoggedIn } from '../utils/auth'
+import { request } from '../utils/request'
 
 type UserStatus = 'WANT_TO_WATCH' | 'WATCHED' | 'NOT_INTERESTED'
 
@@ -12,6 +13,12 @@ const route = useRoute()
 const season = ref<TvSeasonDetail | null>(null)
 const userSeason = ref<UserTvSeasonResponse | null>(null)
 const isUserLoggedIn = ref(isLoggedIn())
+const isAdmin = ref(false)
+const isEditingTitle = ref(false)
+const editableTitle = ref('')
+const editableShowName = ref('')
+const savingTitle = ref(false)
+const titleError = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const saving = ref(false)
@@ -42,6 +49,11 @@ const heroStyle = computed(() => {
 
 async function loadPage() {
   isUserLoggedIn.value = isLoggedIn()
+  isAdmin.value = false
+  isEditingTitle.value = false
+  editableTitle.value = ''
+  editableShowName.value = ''
+  titleError.value = ''
   loading.value = true
   errorMessage.value = ''
   userSeason.value = null
@@ -54,6 +66,7 @@ async function loadPage() {
 
     const token = getToken()
     if (token) {
+      await loadAdminStatus()
       userSeason.value = await getUserTvSeason(id, token)
     }
   } catch (error) {
@@ -61,6 +74,73 @@ async function loadPage() {
     errorMessage.value = '加载剧集详情失败'
   } finally {
     loading.value = false
+  }
+}
+
+async function loadAdminStatus() {
+  isAdmin.value = false
+  if (!isUserLoggedIn.value) {
+    return
+  }
+
+  try {
+    const response = await request('/users/me')
+    if (!response.ok) {
+      return
+    }
+    const data = await response.json()
+    isAdmin.value = Boolean(data.isAdmin)
+  } catch (error) {
+    console.error(error)
+    isAdmin.value = false
+  }
+}
+
+function startTitleEdit() {
+  if (!season.value || !isAdmin.value) {
+    return
+  }
+  editableTitle.value = displayTitle.value || ''
+  editableShowName.value = season.value.showName
+  titleError.value = ''
+  isEditingTitle.value = true
+}
+
+function cancelTitleEdit() {
+  isEditingTitle.value = false
+  editableTitle.value = ''
+  editableShowName.value = ''
+  titleError.value = ''
+}
+
+async function saveTitleEdit() {
+  if (!season.value || savingTitle.value) {
+    return
+  }
+
+  const nextTitle = editableTitle.value.trim()
+  const nextShowName = editableShowName.value.trim()
+  if (!nextTitle) {
+    titleError.value = '标题不能为空'
+    return
+  }
+  if (!nextShowName) {
+    titleError.value = '剧名不能为空'
+    return
+  }
+
+  savingTitle.value = true
+  titleError.value = ''
+
+  try {
+    season.value = await updateTvSeasonTitle(season.value.id, nextTitle, nextShowName)
+    document.title = `${displayTitle.value} - 剧集`
+    cancelTitleEdit()
+  } catch (error) {
+    console.error(error)
+    titleError.value = '保存失败'
+  } finally {
+    savingTitle.value = false
   }
 }
 
@@ -267,9 +347,43 @@ watch(() => route.params.id, () => {
 
           <div class="hero-main hero-summary">
             <div class="title-row">
-              <h1>{{ displayTitle }}</h1>
+              <template v-if="isEditingTitle">
+                <div class="title-edit-fields">
+                  <input
+                    v-model="editableTitle"
+                    class="title-edit-input"
+                    type="text"
+                    maxlength="255"
+                    :disabled="savingTitle"
+                    aria-label="剧集标题"
+                    @keyup.enter="saveTitleEdit"
+                    @keyup.esc="cancelTitleEdit"
+                  />
+                  <input
+                    v-model="editableShowName"
+                    class="show-name-edit-input"
+                    type="text"
+                    maxlength="255"
+                    :disabled="savingTitle"
+                    aria-label="剧名"
+                    @keyup.enter="saveTitleEdit"
+                    @keyup.esc="cancelTitleEdit"
+                  />
+                </div>
+                <button class="title-edit-save" type="button" :disabled="savingTitle" @click="saveTitleEdit">
+                  {{ savingTitle ? '保存中' : '保存' }}
+                </button>
+                <button class="title-edit-cancel" type="button" :disabled="savingTitle" @click="cancelTitleEdit">
+                  取消
+                </button>
+              </template>
+              <template v-else>
+                <h1>{{ displayTitle }}</h1>
+                <button v-if="isAdmin" class="title-edit-trigger" type="button" @click="startTitleEdit">编辑</button>
+              </template>
               <span>{{ releaseYear }}</span>
             </div>
+            <div v-if="titleError" class="title-edit-error">{{ titleError }}</div>
             <p class="original-title">{{ season.originalTitle || season.originalShowName || '原名未知' }}</p>
             <div class="meta-tags">
               <span v-for="genre in season.genres.slice(0, 3)" :key="genre">{{ genre }}</span>
@@ -604,6 +718,81 @@ watch(() => route.params.id, () => {
   color: rgba(255, 255, 255, 0.68);
   font-size: 28px;
   font-weight: 700;
+}
+
+.title-edit-trigger,
+.title-edit-save,
+.title-edit-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 0 14px;
+  color: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.title-edit-save {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+}
+
+.title-edit-cancel {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.title-edit-save:disabled,
+.title-edit-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.title-edit-input {
+  width: min(560px, 100%);
+  min-width: 240px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 10px;
+  padding: 7px 12px;
+  color: #fff;
+  background: rgba(4, 11, 18, 0.44);
+  font-size: 40px;
+  line-height: 1.15;
+  font-weight: 800;
+  outline: none;
+}
+
+.title-edit-fields {
+  display: flex;
+  flex: 1 1 min(560px, 100%);
+  min-width: 240px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.show-name-edit-input {
+  width: min(420px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 9px;
+  padding: 7px 11px;
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(4, 11, 18, 0.32);
+  font-size: 17px;
+  line-height: 1.25;
+  outline: none;
+}
+
+.title-edit-input:focus,
+.show-name-edit-input:focus {
+  border-color: rgba(77, 148, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.24);
+}
+
+.title-edit-error {
+  margin-top: 6px;
+  color: #ffb4a8;
+  font-size: 13px;
 }
 
 .original-title {
@@ -1495,6 +1684,32 @@ watch(() => route.params.id, () => {
   .title-row h1 {
     font-size: 25px;
     line-height: 1.18;
+  }
+
+  .title-edit-input {
+    min-width: 0;
+    font-size: 25px;
+    padding: 6px 9px;
+  }
+
+  .title-edit-fields {
+    min-width: 0;
+    flex: 1 1 100%;
+    gap: 6px;
+  }
+
+  .show-name-edit-input {
+    width: 100%;
+    font-size: 13px;
+    padding: 6px 9px;
+  }
+
+  .title-edit-trigger,
+  .title-edit-save,
+  .title-edit-cancel {
+    min-height: 28px;
+    padding: 0 11px;
+    font-size: 12px;
   }
 
   .title-row span {
